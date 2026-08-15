@@ -308,14 +308,14 @@ local function updateButtons()
 		NearestButton,
 		NearestStroke,
 		"NEAREST STEAL",
-		nearestEnabled
+		nearestDisabled
 	)
 
 	setToggle(
 		HighestButton,
 		HighestStroke,
 		"HIGHEST MONEY STEAL",
-		highestEnabled
+		highestDisabled
 	)
 
 	setToggle(

@@ -2,11 +2,16 @@
 -- FTX ALL-IN-ONE
 -- PLACE ID: 109983668079237
 --
+-- DEFAULTS:
+-- • Nearest Steal = OFF
+-- • Highest Money Steal = OFF
+-- • Auto Kick = ON
+--
 -- MOBILE:
--- • Bottom-right buttons stay 100% size
--- • Brainrot menu = 50%
--- • Radar menu = 50%
--- • Top steal/progress menu = 50%
+-- • Menus = 50%
+-- • Toggle buttons = normal size
+-- • HOP button = TOP-MIDDLE
+-- • HOP stays away from Roblox jump button
 --========================================================
 
 
@@ -49,6 +54,7 @@ local RNG = Random.new()
 --========================================================
 
 local TARGET_PLACE_ID = 109983668079237
+
 local OWNER_NAME = "チキンバナナ"
 
 local MIN_MONEY = 20_000_000
@@ -61,9 +67,11 @@ local BRAINROT_LIST_RATE = 0.75
 local RADAR_LIST_RATE = 0.12
 
 local STEAL_SCAN_RATE = 0.02
+
 local HOLD_START_TIMEOUT = 0.18
 local HOLD_TRIGGER_GRACE = 0.5
 local FAILED_HOLD_RETRY = 0.04
+
 local RESET_FALLBACK = 0.16
 local RESET_TIMEOUT = 4
 
@@ -80,27 +88,37 @@ local MOBILE_MENU_SCALE = 0.5
 --========================================================
 
 pcall(function()
-	local old = CoreGui:FindFirstChild("FTX_AllInOne")
+
+	local old = CoreGui:FindFirstChild(
+		"FTX_AllInOne"
+	)
 
 	if old then
 		old:Destroy()
 	end
+
 end)
 
+
 pcall(function()
-	local old = workspace:FindFirstChild("FTX_WORLD")
+
+	local old = workspace:FindFirstChild(
+		"FTX_WORLD"
+	)
 
 	if old then
 		old:Destroy()
 	end
+
 end)
 
 
 --========================================================
--- MAIN CONTAINERS
+-- MAIN GUI
 --========================================================
 
 local Gui = Instance.new("ScreenGui")
+
 Gui.Name = "FTX_AllInOne"
 Gui.IgnoreGuiInset = true
 Gui.ResetOnSpawn = false
@@ -109,11 +127,13 @@ Gui.Parent = CoreGui
 
 
 local WorldFolder = Instance.new("Folder")
+
 WorldFolder.Name = "FTX_WORLD"
 WorldFolder.Parent = workspace
 
 
 local ESPFolder = Instance.new("Folder")
+
 ESPFolder.Name = "BrainrotESP"
 ESPFolder.Parent = Gui
 
@@ -123,20 +143,32 @@ ESPFolder.Parent = Gui
 --========================================================
 
 local function makeCorner(parent, radius)
-	local x = Instance.new("UICorner")
-	x.CornerRadius = UDim.new(0, radius or 12)
-	x.Parent = parent
 
-	return x
+	local corner = Instance.new("UICorner")
+
+	corner.CornerRadius = UDim.new(
+		0,
+		radius or 12
+	)
+
+	corner.Parent = parent
+
+	return corner
+
 end
 
 
-local function makeStroke(parent, thickness, color)
-	local x = Instance.new("UIStroke")
+local function makeStroke(
+	parent,
+	thickness,
+	color
+)
 
-	x.Thickness = thickness or 2
+	local stroke = Instance.new("UIStroke")
 
-	x.Color =
+	stroke.Thickness = thickness or 2
+
+	stroke.Color =
 		color
 		or Color3.fromRGB(
 			90,
@@ -144,16 +176,26 @@ local function makeStroke(parent, thickness, color)
 			95
 		)
 
-	x.Parent = parent
+	stroke.Parent = parent
 
-	return x
+	return stroke
+
 end
 
 
-local function createButton(text, y, width, height)
+local function createButton(
+	text,
+	y,
+	width,
+	height
+)
+
 	local holder = Instance.new("Frame")
 
-	holder.AnchorPoint = Vector2.new(1, 1)
+	holder.AnchorPoint = Vector2.new(
+		1,
+		1
+	)
 
 	holder.Position = UDim2.new(
 		1,
@@ -179,15 +221,26 @@ local function createButton(text, y, width, height)
 	holder.BorderSizePixel = 0
 	holder.Parent = Gui
 
-	makeCorner(holder, 14)
+	makeCorner(
+		holder,
+		14
+	)
 
-	local outline = makeStroke(holder, 2)
+	local outline = makeStroke(
+		holder,
+		2
+	)
 
 	local button = Instance.new("TextButton")
 
-	button.Size = UDim2.fromScale(1, 1)
+	button.Size = UDim2.fromScale(
+		1,
+		1
+	)
+
 	button.BackgroundTransparency = 1
 	button.AutoButtonColor = false
+
 	button.Text = text
 
 	button.TextColor3 = Color3.fromRGB(
@@ -198,15 +251,16 @@ local function createButton(text, y, width, height)
 
 	button.Font = Enum.Font.GothamBold
 	button.TextSize = 14
+
 	button.Parent = holder
 
 	return holder, button, outline
+
 end
 
 
 --========================================================
 -- BUTTONS
--- THESE STAY 100% SIZE ON MOBILE
 --========================================================
 
 local HopHolder,
@@ -227,7 +281,7 @@ local NearestHolder,
 	NearestButton,
 	NearestStroke =
 	createButton(
-		"NEAREST STEAL • ON",
+		"NEAREST STEAL • OFF",
 		-90,
 		215,
 		48
@@ -260,7 +314,7 @@ local AutoKickHolder,
 -- TOGGLES
 --========================================================
 
-local nearestEnabled = true
+local nearestEnabled = false
 local highestEnabled = false
 local autoKickEnabled = true
 
@@ -271,8 +325,12 @@ local function setToggle(
 	title,
 	state
 )
+
 	if state then
-		button.Text = title .. " • ON"
+
+		button.Text =
+			title
+			.. " • ON"
 
 		button.TextColor3 = Color3.fromRGB(
 			255,
@@ -285,8 +343,12 @@ local function setToggle(
 			180,
 			25
 		)
+
 	else
-		button.Text = title .. " • OFF"
+
+		button.Text =
+			title
+			.. " • OFF"
 
 		button.TextColor3 = Color3.fromRGB(
 			180,
@@ -299,23 +361,26 @@ local function setToggle(
 			90,
 			95
 		)
+
 	end
+
 end
 
 
 local function updateButtons()
+
 	setToggle(
 		NearestButton,
 		NearestStroke,
 		"NEAREST STEAL",
-		nearestDisabled
+		nearestEnabled
 	)
 
 	setToggle(
 		HighestButton,
 		HighestStroke,
 		"HIGHEST MONEY STEAL",
-		highestDisabled
+		highestEnabled
 	)
 
 	setToggle(
@@ -324,16 +389,20 @@ local function updateButtons()
 		"AUTO KICK",
 		autoKickEnabled
 	)
+
 end
+
 
 updateButtons()
 
 
 --========================================================
--- HOP ANIMATION
+-- HOP GRADIENT
 --========================================================
 
-local HopGradient = Instance.new("UIGradient")
+local HopGradient = Instance.new(
+	"UIGradient"
+)
 
 HopGradient.Color = ColorSequence.new({
 
@@ -370,34 +439,41 @@ HopGradient.Parent = HopStroke
 
 
 task.spawn(function()
+
 	while Gui.Parent do
-		local tween =
-			TweenService:Create(
-				HopGradient,
 
-				TweenInfo.new(
-					2,
-					Enum.EasingStyle.Linear
-				),
+		local tween = TweenService:Create(
 
-				{
-					Rotation =
-						HopGradient.Rotation
-						+ 360
-				}
-			)
+			HopGradient,
+
+			TweenInfo.new(
+				2,
+				Enum.EasingStyle.Linear
+			),
+
+			{
+				Rotation =
+					HopGradient.Rotation
+					+ 360
+			}
+
+		)
 
 		tween:Play()
 		tween.Completed:Wait()
+
 	end
+
 end)
 
 
 --========================================================
--- STEAL PROGRESS UI
+-- PROGRESS BAR
 --========================================================
 
-local Progress = Instance.new("Frame")
+local Progress = Instance.new(
+	"Frame"
+)
 
 Progress.AnchorPoint = Vector2.new(
 	0.5,
@@ -427,9 +503,15 @@ Progress.BackgroundColor3 = Color3.fromRGB(
 Progress.BackgroundTransparency = 0.05
 Progress.BorderSizePixel = 0
 Progress.Visible = false
+
 Progress.Parent = Gui
 
-makeCorner(Progress, 18)
+
+makeCorner(
+	Progress,
+	18
+)
+
 
 makeStroke(
 	Progress,
@@ -442,7 +524,9 @@ makeStroke(
 )
 
 
-local ProgressTitle = Instance.new("TextLabel")
+local ProgressTitle = Instance.new(
+	"TextLabel"
+)
 
 ProgressTitle.Position = UDim2.new(
 	0,
@@ -469,11 +553,16 @@ ProgressTitle.TextColor3 = Color3.fromRGB(
 
 ProgressTitle.Font = Enum.Font.GothamBlack
 ProgressTitle.TextSize = 18
-ProgressTitle.TextXAlignment = Enum.TextXAlignment.Left
+
+ProgressTitle.TextXAlignment =
+	Enum.TextXAlignment.Left
+
 ProgressTitle.Parent = Progress
 
 
-local ProgressPercent = Instance.new("TextLabel")
+local ProgressPercent = Instance.new(
+	"TextLabel"
+)
 
 ProgressPercent.AnchorPoint = Vector2.new(
 	1,
@@ -505,10 +594,13 @@ ProgressPercent.TextColor3 = Color3.fromRGB(
 
 ProgressPercent.Font = Enum.Font.GothamBlack
 ProgressPercent.TextSize = 17
+
 ProgressPercent.Parent = Progress
 
 
-local ProgressTrack = Instance.new("Frame")
+local ProgressTrack = Instance.new(
+	"Frame"
+)
 
 ProgressTrack.Position = UDim2.new(
 	0,
@@ -532,12 +624,19 @@ ProgressTrack.BackgroundColor3 = Color3.fromRGB(
 
 ProgressTrack.BorderSizePixel = 0
 ProgressTrack.ClipsDescendants = true
+
 ProgressTrack.Parent = Progress
 
-makeCorner(ProgressTrack, 20)
+
+makeCorner(
+	ProgressTrack,
+	20
+)
 
 
-local ProgressFill = Instance.new("Frame")
+local ProgressFill = Instance.new(
+	"Frame"
+)
 
 ProgressFill.Size = UDim2.new(
 	0,
@@ -546,19 +645,27 @@ ProgressFill.Size = UDim2.new(
 	0
 )
 
-ProgressFill.BackgroundColor3 = Color3.new(
-	1,
-	1,
-	1
-)
+ProgressFill.BackgroundColor3 =
+	Color3.new(
+		1,
+		1,
+		1
+	)
 
 ProgressFill.BorderSizePixel = 0
+
 ProgressFill.Parent = ProgressTrack
 
-makeCorner(ProgressFill, 20)
+
+makeCorner(
+	ProgressFill,
+	20
+)
 
 
-local FillGradient = Instance.new("UIGradient")
+local FillGradient = Instance.new(
+	"UIGradient"
+)
 
 FillGradient.Color = ColorSequence.new({
 
@@ -595,34 +702,37 @@ FillGradient.Parent = ProgressFill
 
 
 task.spawn(function()
+
 	while Gui.Parent do
-		FillGradient.Offset =
-			Vector2.new(
-				-1,
-				0
-			)
 
-		local tween =
-			TweenService:Create(
-				FillGradient,
+		FillGradient.Offset = Vector2.new(
+			-1,
+			0
+		)
 
-				TweenInfo.new(
-					1.1,
-					Enum.EasingStyle.Linear
-				),
+		local tween = TweenService:Create(
 
-				{
-					Offset =
-						Vector2.new(
-							1,
-							0
-						)
-				}
-			)
+			FillGradient,
+
+			TweenInfo.new(
+				1.1,
+				Enum.EasingStyle.Linear
+			),
+
+			{
+				Offset = Vector2.new(
+					1,
+					0
+				)
+			}
+
+		)
 
 		tween:Play()
 		tween.Completed:Wait()
+
 	end
+
 end)
 
 
@@ -634,20 +744,22 @@ local RootAttachment = nil
 
 
 local function getRoot()
+
 	local character = LP.Character
 
 	if not character then
 		return nil
 	end
 
-	return
-		character:FindFirstChild(
-			"HumanoidRootPart"
-		)
+	return character:FindFirstChild(
+		"HumanoidRootPart"
+	)
+
 end
 
 
 local function getRootAttachment()
+
 	local root = getRoot()
 
 	if not root then
@@ -658,7 +770,9 @@ local function getRootAttachment()
 		RootAttachment
 		and RootAttachment.Parent == root
 	then
+
 		return RootAttachment
+
 	end
 
 	RootAttachment =
@@ -667,6 +781,7 @@ local function getRootAttachment()
 		)
 
 	if not RootAttachment then
+
 		RootAttachment =
 			Instance.new(
 				"Attachment"
@@ -677,9 +792,11 @@ local function getRootAttachment()
 
 		RootAttachment.Parent =
 			root
+
 	end
 
 	return RootAttachment
+
 end
 
 
@@ -687,7 +804,11 @@ end
 -- DISTANCE
 --========================================================
 
-local function horizontalDistance(a, b)
+local function horizontalDistance(
+	a,
+	b
+)
+
 	local dx = a.X - b.X
 	local dz = a.Z - b.Z
 
@@ -695,6 +816,7 @@ local function horizontalDistance(a, b)
 		dx * dx
 		+ dz * dz
 	)
+
 end
 
 
@@ -702,11 +824,14 @@ local function closestPointDistance(
 	position,
 	part
 )
+
 	if
 		not part
 		or not part.Parent
 	then
+
 		return math.huge
+
 	end
 
 	local localPosition =
@@ -747,11 +872,11 @@ local function closestPointDistance(
 				closest
 			)
 
-	return
-		horizontalDistance(
-			position,
-			world
-		)
+	return horizontalDistance(
+		position,
+		world
+	)
+
 end
 
 
@@ -760,16 +885,17 @@ end
 --========================================================
 
 local function parseMoney(text)
+
 	if typeof(text) ~= "string" then
 		return nil
 	end
 
 	local clean =
-		text
-			:upper()
-			:gsub(",", "")
-			:gsub("^%s+", "")
-			:gsub("%s+$", "")
+		text:
+			upper():
+			gsub(",", ""):
+			gsub("^%s+", ""):
+			gsub("%s+$", "")
 
 	local number,
 		suffix =
@@ -778,25 +904,26 @@ local function parseMoney(text)
 		)
 
 	if not number then
+
 		number,
 			suffix =
 			clean:match(
 				"^%$([%d%.]+)([KMBTQ]?)%s*/%s*SEC$"
 			)
+
 	end
 
 	if not number then
+
 		number,
 			suffix =
 			clean:match(
 				"^%$([%d%.]+)([KMBTQ]?)%s*PER%s*SEC$"
 			)
+
 	end
 
-	number =
-		tonumber(
-			number
-		)
+	number = tonumber(number)
 
 	if not number then
 		return nil
@@ -818,48 +945,55 @@ local function parseMoney(text)
 
 	elseif suffix == "Q" then
 		multiplier = 1e15
+
 	end
 
-	return
-		number
-		* multiplier
+	return number * multiplier
+
 end
 
 
 local function formatMoney(value)
+
 	if not value then
 		return "$0/s"
 	end
 
 	if value >= 1e15 then
+
 		return string.format(
 			"$%.2fQ/s",
 			value / 1e15
 		)
 
 	elseif value >= 1e12 then
+
 		return string.format(
 			"$%.2fT/s",
 			value / 1e12
 		)
 
 	elseif value >= 1e9 then
+
 		return string.format(
 			"$%.2fB/s",
 			value / 1e9
 		)
 
 	elseif value >= 1e6 then
+
 		return string.format(
 			"$%.2fM/s",
 			value / 1e6
 		)
 
 	elseif value >= 1e3 then
+
 		return string.format(
 			"$%.2fK/s",
 			value / 1e3
 		)
+
 	end
 
 	return
@@ -870,48 +1004,79 @@ local function formatMoney(value)
 			)
 		)
 		.. "/s"
+
 end
 
 
 --========================================================
--- WORLD PART FINDER
+-- WORLD PART
 --========================================================
 
 local function getWorldPart(object)
+
 	local current = object
 
 	for _ = 1, 24 do
+
 		if not current then
 			break
 		end
 
 		if
-			current:IsA("BillboardGui")
-			or current:IsA("SurfaceGui")
+			current:IsA(
+				"BillboardGui"
+			)
+
+			or current:IsA(
+				"SurfaceGui"
+			)
 		then
+
 			local adornee =
 				current.Adornee
 
 			if adornee then
-				if adornee:IsA("BasePart") then
+
+				if adornee:IsA(
+					"BasePart"
+				) then
+
 					return adornee
+
 				end
 
 				if
-					adornee:IsA("Attachment")
+					adornee:IsA(
+						"Attachment"
+					)
+
 					and adornee.Parent
-					and adornee.Parent:IsA("BasePart")
+
+					and adornee.Parent:IsA(
+						"BasePart"
+					)
 				then
+
 					return adornee.Parent
+
 				end
+
 			end
+
 		end
 
-		if current:IsA("BasePart") then
+		if current:IsA(
+			"BasePart"
+		) then
+
 			return current
+
 		end
 
-		if current:IsA("Model") then
+		if current:IsA(
+			"Model"
+		) then
+
 			if current.PrimaryPart then
 				return current.PrimaryPart
 			end
@@ -926,13 +1091,15 @@ local function getWorldPart(object)
 			if part then
 				return part
 			end
+
 		end
 
-		current =
-			current.Parent
+		current = current.Parent
+
 	end
 
 	return nil
+
 end
 
 
@@ -964,11 +1131,14 @@ local ignoredWords = {
 
 
 local function invalidBrainrotName(text)
+
 	if
 		not text
 		or text == ""
 	then
+
 		return true
+
 	end
 
 	if parseMoney(text) then
@@ -978,36 +1148,43 @@ local function invalidBrainrotName(text)
 	local upper =
 		text:upper()
 
-	if
-		upper:find(
-			"$",
-			1,
-			true
-		)
-	then
+	if upper:find(
+		"$",
+		1,
+		true
+	) then
+
 		return true
+
 	end
 
 	for _, word in ipairs(
 		ignoredWords
 	) do
+
 		if
 			upper == word
+
 			or upper:find(
 				word,
 				1,
 				true
 			)
 		then
+
 			return true
+
 		end
+
 	end
 
 	return false
+
 end
 
 
 local function findBrainrotName(label)
+
 	local gui =
 		label:
 			FindFirstAncestorWhichIsA(
@@ -1035,13 +1212,21 @@ local function findBrainrotName(label)
 	for _, object in ipairs(
 		gui:GetDescendants()
 	) do
+
 		if
 			object ~= label
+
 			and (
-				object:IsA("TextLabel")
-				or object:IsA("TextButton")
+				object:IsA(
+					"TextLabel"
+				)
+
+				or object:IsA(
+					"TextButton"
+				)
 			)
 		then
+
 			local text =
 				tostring(
 					object.Text
@@ -1052,9 +1237,12 @@ local function findBrainrotName(label)
 				not invalidBrainrotName(
 					text
 				)
+
 				and #text >= 2
+
 				and #text <= 70
 			then
+
 				local other =
 					object.AbsolutePosition
 					+ object.AbsoluteSize / 2
@@ -1075,42 +1263,47 @@ local function findBrainrotName(label)
 					object.Parent
 					== label.Parent
 				then
+
 					score += 1000
+
 				end
 
 				if
 					dy >= -10
 					and dy <= 170
 				then
+
 					score +=
 						500
-						- math.abs(
-							dy
-						)
+						- math.abs(dy)
+
 				end
 
-				score +=
-					math.max(
-						0,
-						300 - dx
-					)
+				score += math.max(
+					0,
+					300 - dx
+				)
 
 				if score > bestScore then
+
 					bestScore = score
 					best = text
+
 				end
+
 			end
+
 		end
+
 	end
 
-	return
-		best
-		or "UNKNOWN"
+	return best or "UNKNOWN"
+
 end
 
 
 --========================================================
--- MONEY STORAGE
+-- BRAINROT STORAGE
 --========================================================
 
 local MoneyTargets = {}
@@ -1119,7 +1312,7 @@ local BrainrotESP = {}
 
 
 --========================================================
--- CLICKED BRAINROT LINE
+-- SELECTED LINE
 --========================================================
 
 local SelectedLabel = nil
@@ -1128,17 +1321,23 @@ local SelectedAttachment = nil
 
 
 local function clearSelected()
+
 	SelectedLabel = nil
 
 	if SelectedBeam then
+
 		SelectedBeam:Destroy()
 		SelectedBeam = nil
+
 	end
 
 	if SelectedAttachment then
+
 		SelectedAttachment:Destroy()
 		SelectedAttachment = nil
+
 	end
+
 end
 
 
@@ -1146,9 +1345,12 @@ local function selectBrainrot(
 	label,
 	data
 )
+
 	if SelectedLabel == label then
+
 		clearSelected()
 		return
+
 	end
 
 	clearSelected()
@@ -1158,11 +1360,12 @@ local function selectBrainrot(
 		or not data.Part
 		or not data.Part.Parent
 	then
+
 		return
+
 	end
 
-	SelectedLabel =
-		label
+	SelectedLabel = label
 
 	SelectedAttachment =
 		Instance.new(
@@ -1191,8 +1394,10 @@ local function selectBrainrot(
 		SelectedAttachment
 
 	SelectedBeam.FaceCamera = true
+
 	SelectedBeam.Width0 = 0.32
 	SelectedBeam.Width1 = 0.32
+
 	SelectedBeam.LightEmission = 0.5
 
 	SelectedBeam.Color =
@@ -1211,6 +1416,7 @@ local function selectBrainrot(
 
 	SelectedBeam.Parent =
 		WorldFolder
+
 end
 
 
@@ -1219,16 +1425,16 @@ end
 --========================================================
 
 local function removeESP(label)
+
 	if SelectedLabel == label then
 		clearSelected()
 	end
 
 	local data =
-		BrainrotESP[
-			label
-		]
+		BrainrotESP[label]
 
 	if data then
+
 		if data.Gui then
 			data.Gui:Destroy()
 		end
@@ -1240,9 +1446,11 @@ local function removeESP(label)
 		if data.Attachment then
 			data.Attachment:Destroy()
 		end
+
 	end
 
 	BrainrotESP[label] = nil
+
 end
 
 
@@ -1250,6 +1458,7 @@ local function createESP(
 	label,
 	data
 )
+
 	if BrainrotESP[label] then
 		return
 	end
@@ -1258,7 +1467,9 @@ local function createESP(
 		not data
 		or not data.Part
 	then
+
 		return
+
 	end
 
 	local billboard =
@@ -1326,7 +1537,9 @@ local function createESP(
 		Enum.Font.GothamBlack
 
 	text.TextScaled = true
-	text.Parent = billboard
+
+	text.Parent =
+		billboard
 
 
 	local attachment =
@@ -1350,8 +1563,10 @@ local function createESP(
 		attachment
 
 	beam.FaceCamera = true
+
 	beam.Width0 = 0.13
 	beam.Width1 = 0.13
+
 	beam.LightEmission = 1
 
 	beam.Color =
@@ -1378,6 +1593,7 @@ local function createESP(
 
 
 	local function update()
+
 		if not label.Parent then
 			return
 		end
@@ -1390,6 +1606,7 @@ local function createESP(
 			.. tostring(
 				label.Text
 			)
+
 	end
 
 
@@ -1400,6 +1617,7 @@ local function createESP(
 		espData
 
 	update()
+
 end
 
 
@@ -1408,11 +1626,14 @@ end
 --========================================================
 
 local function checkMoney(object)
+
 	if
 		not object
 		or not object.Parent
 	then
+
 		return
+
 	end
 
 	local value =
@@ -1421,6 +1642,7 @@ local function checkMoney(object)
 		)
 
 	if not value then
+
 		MoneyTargets[object] = nil
 
 		removeESP(
@@ -1428,6 +1650,7 @@ local function checkMoney(object)
 		)
 
 		return
+
 	end
 
 	local part =
@@ -1442,6 +1665,7 @@ local function checkMoney(object)
 	local data = {
 
 		Value = value,
+
 		Part = part,
 
 		Name =
@@ -1456,47 +1680,60 @@ local function checkMoney(object)
 
 	}
 
-	MoneyTargets[object] =
-		data
+	MoneyTargets[object] = data
 
 	if value >= MIN_MONEY then
+
 		if not BrainrotESP[object] then
+
 			createESP(
 				object,
 				data
 			)
+
 		else
+
 			local esp =
-				BrainrotESP[
-					object
-				]
+				BrainrotESP[object]
 
 			if esp.Update then
 				esp.Update()
 			end
+
 		end
+
 	else
+
 		removeESP(
 			object
 		)
+
 	end
+
 end
 
 
 local function watchMoney(object)
+
 	if WatchedMoney[object] then
 		return
 	end
 
 	if
-		not object:IsA("TextLabel")
-		and not object:IsA("TextButton")
+		not object:IsA(
+			"TextLabel"
+		)
+
+		and not object:IsA(
+			"TextButton"
+		)
 	then
+
 		return
+
 	end
 
-	WatchedMoney[object] =
-		true
+	WatchedMoney[object] = true
 
 	checkMoney(
 		object
@@ -1521,26 +1758,36 @@ local function watchMoney(object)
 		)
 
 			if not parent then
-				MoneyTargets[object] =
-					nil
+
+				MoneyTargets[object] = nil
 
 				removeESP(
 					object
 				)
+
 			end
 
 		end)
+
 end
 
 
 local function scanMoney()
+
 	for i, object in ipairs(
 		workspace:GetDescendants()
 	) do
+
 		if
-			object:IsA("TextLabel")
-			or object:IsA("TextButton")
+			object:IsA(
+				"TextLabel"
+			)
+
+			or object:IsA(
+				"TextButton"
+			)
 		then
+
 			watchMoney(
 				object
 			)
@@ -1548,12 +1795,15 @@ local function scanMoney()
 			checkMoney(
 				object
 			)
+
 		end
 
 		if i % 500 == 0 then
 			task.wait()
 		end
+
 	end
+
 end
 
 
@@ -1569,13 +1819,17 @@ workspace.DescendantAdded:
 
 
 task.spawn(function()
+
 	while Gui.Parent do
+
 		task.wait(
 			MONEY_RESCAN_RATE
 		)
 
 		scanMoney()
+
 	end
+
 end)
 
 
@@ -1619,12 +1873,16 @@ BrainrotPanel.BackgroundColor3 =
 
 BrainrotPanel.BackgroundTransparency = 0.08
 BrainrotPanel.BorderSizePixel = 0
-BrainrotPanel.Parent = Gui
+
+BrainrotPanel.Parent =
+	Gui
+
 
 makeCorner(
 	BrainrotPanel,
 	16
 )
+
 
 makeStroke(
 	BrainrotPanel,
@@ -1667,22 +1925,26 @@ BrainrotTitle.Font =
 	Enum.Font.GothamBlack
 
 BrainrotTitle.TextSize = 16
-BrainrotTitle.TextXAlignment = Enum.TextXAlignment.Left
-BrainrotTitle.Parent = BrainrotPanel
+
+BrainrotTitle.TextXAlignment =
+	Enum.TextXAlignment.Left
+
+BrainrotTitle.Parent =
+	BrainrotPanel
 
 
-local titlePad =
+local TitlePadding =
 	Instance.new(
 		"UIPadding"
 	)
 
-titlePad.PaddingLeft =
+TitlePadding.PaddingLeft =
 	UDim.new(
 		0,
 		12
 	)
 
-titlePad.Parent =
+TitlePadding.Parent =
 	BrainrotTitle
 
 
@@ -1709,10 +1971,17 @@ BrainrotList.Size =
 
 BrainrotList.BackgroundTransparency = 1
 BrainrotList.BorderSizePixel = 0
+
 BrainrotList.ScrollBarThickness = 4
-BrainrotList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-BrainrotList.CanvasSize = UDim2.new()
-BrainrotList.Parent = BrainrotPanel
+
+BrainrotList.AutomaticCanvasSize =
+	Enum.AutomaticSize.Y
+
+BrainrotList.CanvasSize =
+	UDim2.new()
+
+BrainrotList.Parent =
+	BrainrotPanel
 
 
 local BrainrotLayout =
@@ -1734,7 +2003,7 @@ BrainrotLayout.Parent =
 
 
 --========================================================
--- DRAG BRAINROT PANEL
+-- DRAG BRAINROT MENU
 --========================================================
 
 local dragging = false
@@ -1754,8 +2023,12 @@ BrainrotTitle.InputBegan:
 		then
 
 			dragging = true
-			dragStart = input.Position
-			dragPanelStart = BrainrotPanel.Position
+
+			dragStart =
+				input.Position
+
+			dragPanelStart =
+				BrainrotPanel.Position
 
 		end
 
@@ -1822,16 +2095,23 @@ UserInputService.InputChanged:
 
 
 --========================================================
--- BRAINROT LIST UPDATE
+-- BRAINROT LIST
 --========================================================
 
 local function updateBrainrotList()
+
 	for _, child in ipairs(
 		BrainrotList:GetChildren()
 	) do
-		if child:IsA("GuiButton") then
+
+		if child:IsA(
+			"GuiButton"
+		) then
+
 			child:Destroy()
+
 		end
+
 	end
 
 	local entries = {}
@@ -1839,14 +2119,18 @@ local function updateBrainrotList()
 	for label, data in pairs(
 		MoneyTargets
 	) do
+
 		if
 			label
 			and label.Parent
+
 			and data
 			and data.Value >= MIN_MONEY
+
 			and data.Part
 			and data.Part.Parent
 		then
+
 			table.insert(
 				entries,
 
@@ -1854,29 +2138,38 @@ local function updateBrainrotList()
 					Label = label,
 					Data = data
 				}
+
 			)
+
 		end
+
 	end
 
 	table.sort(
+
 		entries,
 
 		function(a, b)
+
 			return
 				a.Data.Value
 				> b.Data.Value
+
 		end
+
 	)
 
 	for index, info in ipairs(
 		entries
 	) do
+
 		local row =
 			Instance.new(
 				"TextButton"
 			)
 
-		row.LayoutOrder = index
+		row.LayoutOrder =
+			index
 
 		row.Size =
 			UDim2.new(
@@ -1895,14 +2188,19 @@ local function updateBrainrotList()
 
 		row.BackgroundTransparency = 0.08
 		row.BorderSizePixel = 0
+
 		row.AutoButtonColor = false
 		row.Text = ""
-		row.Parent = BrainrotList
+
+		row.Parent =
+			BrainrotList
+
 
 		makeCorner(
 			row,
 			10
 		)
+
 
 		local rowStroke =
 			makeStroke(
@@ -1915,10 +2213,12 @@ local function updateBrainrotList()
 				)
 			)
 
+
 		if
 			SelectedLabel
 			== info.Label
 		then
+
 			rowStroke.Color =
 				Color3.fromRGB(
 					255,
@@ -1927,7 +2227,9 @@ local function updateBrainrotList()
 				)
 
 			rowStroke.Thickness = 2.5
+
 		end
+
 
 		local name =
 			Instance.new(
@@ -1972,9 +2274,15 @@ local function updateBrainrotList()
 			Enum.Font.GothamBold
 
 		name.TextSize = 13
-		name.TextXAlignment = Enum.TextXAlignment.Left
-		name.TextTruncate = Enum.TextTruncate.AtEnd
-		name.Parent = row
+
+		name.TextXAlignment =
+			Enum.TextXAlignment.Left
+
+		name.TextTruncate =
+			Enum.TextTruncate.AtEnd
+
+		name.Parent =
+			row
 
 
 		local money =
@@ -2017,8 +2325,12 @@ local function updateBrainrotList()
 			Enum.Font.GothamBlack
 
 		money.TextSize = 13
-		money.TextXAlignment = Enum.TextXAlignment.Left
-		money.Parent = row
+
+		money.TextXAlignment =
+			Enum.TextXAlignment.Left
+
+		money.Parent =
+			row
 
 
 		row.MouseButton1Click:
@@ -2030,14 +2342,18 @@ local function updateBrainrotList()
 					]
 
 				if latest then
+
 					selectBrainrot(
 						info.Label,
 						latest
 					)
+
 				end
 
 			end)
+
 	end
+
 
 	BrainrotTitle.Text =
 		"BRAINROTS $20M+ • "
@@ -2045,63 +2361,79 @@ local function updateBrainrotList()
 			#entries
 		)
 		.. " FOUND"
+
 end
 
 
 task.spawn(function()
+
 	while Gui.Parent do
+
 		updateBrainrotList()
 
 		task.wait(
 			BRAINROT_LIST_RATE
 		)
+
 	end
+
 end)
 
 
 --========================================================
--- KEEP ESP ATTACHED
+-- KEEP LINES ATTACHED
 --========================================================
 
 task.spawn(function()
+
 	while Gui.Parent do
-		local attachment =
+
+		local rootAttachment =
 			getRootAttachment()
 
 		for label, data in pairs(
 			BrainrotESP
 		) do
+
 			if
 				not label.Parent
 				or not data.Beam
 			then
+
 				removeESP(
 					label
 				)
 
-			elseif attachment then
+			elseif rootAttachment then
+
 				data.Beam.Attachment0 =
-					attachment
+					rootAttachment
+
 			end
+
 		end
 
 		if
 			SelectedBeam
-			and attachment
+			and rootAttachment
 		then
+
 			SelectedBeam.Attachment0 =
-				attachment
+				rootAttachment
+
 		end
 
 		task.wait(
 			0.25
 		)
+
 	end
+
 end)
 
 
 --========================================================
--- PROMPT CACHE
+-- PROMPTS
 --========================================================
 
 local Prompts = {}
@@ -2110,12 +2442,15 @@ local PromptBlocked = {}
 
 
 local function isStealPrompt(prompt)
+
 	if
 		not prompt
 		or not prompt.Parent
 		or not prompt.Enabled
 	then
+
 		return false
+
 	end
 
 	local action =
@@ -2146,22 +2481,31 @@ local function isStealPrompt(prompt)
 			true
 		)
 		~= nil
+
 end
 
 
 local function addPrompt(object)
-	if object:IsA("ProximityPrompt") then
+
+	if object:IsA(
+		"ProximityPrompt"
+	) then
+
 		Prompts[object] = true
+
 	end
+
 end
 
 
 for _, object in ipairs(
 	workspace:GetDescendants()
 ) do
+
 	addPrompt(
 		object
 	)
+
 end
 
 
@@ -2184,8 +2528,7 @@ workspace.DescendantRemoving:
 ProximityPromptService.PromptShown:
 	Connect(function(prompt)
 
-		VisiblePrompts[prompt] =
-			true
+		VisiblePrompts[prompt] = true
 
 	end)
 
@@ -2193,8 +2536,7 @@ ProximityPromptService.PromptShown:
 ProximityPromptService.PromptHidden:
 	Connect(function(prompt)
 
-		VisiblePrompts[prompt] =
-			false
+		VisiblePrompts[prompt] = false
 
 	end)
 
@@ -2204,22 +2546,33 @@ ProximityPromptService.PromptHidden:
 --========================================================
 
 local function promptPosition(prompt)
+
 	if
 		not prompt
 		or not prompt.Parent
 	then
+
 		return nil
+
 	end
 
 	local parent =
 		prompt.Parent
 
-	if parent:IsA("Attachment") then
+	if parent:IsA(
+		"Attachment"
+	) then
+
 		return parent.WorldPosition
+
 	end
 
-	if parent:IsA("BasePart") then
+	if parent:IsA(
+		"BasePart"
+	) then
+
 		return parent.Position
+
 	end
 
 	local model =
@@ -2229,6 +2582,7 @@ local function promptPosition(prompt)
 			)
 
 	if model then
+
 		local part =
 			model.PrimaryPart
 
@@ -2241,30 +2595,47 @@ local function promptPosition(prompt)
 		if part then
 			return part.Position
 		end
+
 	end
 
 	return nil
+
 end
 
 
 local function promptPart(prompt)
+
 	if
 		not prompt
 		or not prompt.Parent
 	then
+
 		return nil
+
 	end
 
 	if
-		prompt.Parent:IsA("Attachment")
+		prompt.Parent:IsA(
+			"Attachment"
+		)
+
 		and prompt.Parent.Parent
-		and prompt.Parent.Parent:IsA("BasePart")
+
+		and prompt.Parent.Parent:IsA(
+			"BasePart"
+		)
 	then
+
 		return prompt.Parent.Parent
+
 	end
 
-	if prompt.Parent:IsA("BasePart") then
+	if prompt.Parent:IsA(
+		"BasePart"
+	) then
+
 		return prompt.Parent
+
 	end
 
 	local model =
@@ -2274,6 +2645,7 @@ local function promptPart(prompt)
 			)
 
 	if model then
+
 		return
 			model.PrimaryPart
 
@@ -2282,9 +2654,11 @@ local function promptPart(prompt)
 					"BasePart",
 					true
 				)
+
 	end
 
 	return nil
+
 end
 
 
@@ -2293,8 +2667,13 @@ end
 --========================================================
 
 local function promptInRange(prompt)
-	if not isStealPrompt(prompt) then
+
+	if not isStealPrompt(
+		prompt
+	) then
+
 		return false
+
 	end
 
 	local root =
@@ -2309,7 +2688,9 @@ local function promptInRange(prompt)
 		not root
 		or not pos
 	then
+
 		return false
+
 	end
 
 	local maxDistance =
@@ -2324,14 +2705,19 @@ local function promptInRange(prompt)
 			- pos
 		).Magnitude
 
-		<= maxDistance
-			+ 0.75
+		<= maxDistance + 0.75
+
 end
 
 
 local function promptUsable(prompt)
-	if not promptInRange(prompt) then
+
+	if not promptInRange(
+		prompt
+	) then
+
 		return false
+
 	end
 
 	if PromptBlocked[prompt] then
@@ -2342,18 +2728,22 @@ local function promptUsable(prompt)
 		VisiblePrompts[prompt]
 		== false
 	then
+
 		return false
+
 	end
 
 	return true
+
 end
 
 
 --========================================================
--- NEAREST PROMPT
+-- NEAREST STEAL
 --========================================================
 
 local function promptPhysicalDistance(prompt)
+
 	local root =
 		getRoot()
 
@@ -2367,11 +2757,13 @@ local function promptPhysicalDistance(prompt)
 		)
 
 	if part then
+
 		return
 			closestPointDistance(
 				root.Position,
 				part
 			)
+
 	end
 
 	local pos =
@@ -2388,33 +2780,41 @@ local function promptPhysicalDistance(prompt)
 			root.Position,
 			pos
 		)
+
 end
 
 
 local function getNearestSteal()
+
 	local best = nil
 	local bestDistance = math.huge
 
 	for prompt in pairs(
 		Prompts
 	) do
-		if promptUsable(prompt) then
+
+		if promptUsable(
+			prompt
+		) then
+
 			local distance =
 				promptPhysicalDistance(
 					prompt
 				)
 
-			if
-				distance
-				< bestDistance
-			then
+			if distance < bestDistance then
+
 				best = prompt
 				bestDistance = distance
+
 			end
+
 		end
+
 	end
 
 	return best, bestDistance
+
 end
 
 
@@ -2423,6 +2823,7 @@ end
 --========================================================
 
 local function promptMoney(prompt)
+
 	local position =
 		promptPosition(
 			prompt
@@ -2438,10 +2839,12 @@ local function promptMoney(prompt)
 	for _, data in pairs(
 		MoneyTargets
 	) do
+
 		if
 			data.Part
 			and data.Part.Parent
 		then
+
 			local distance =
 				horizontalDistance(
 					position,
@@ -2452,13 +2855,18 @@ local function promptMoney(prompt)
 				distance < bestDistance
 				and distance <= 25
 			then
+
 				bestDistance = distance
 				best = data.Value
+
 			end
+
 		end
+
 	end
 
 	return best
+
 end
 
 
@@ -2467,6 +2875,7 @@ end
 --========================================================
 
 local function getHighestMoneySteal()
+
 	local best = nil
 	local bestMoney = -math.huge
 	local bestDistance = math.huge
@@ -2474,13 +2883,18 @@ local function getHighestMoneySteal()
 	for prompt in pairs(
 		Prompts
 	) do
-		if promptUsable(prompt) then
+
+		if promptUsable(
+			prompt
+		) then
+
 			local money =
 				promptMoney(
 					prompt
 				)
 
 			if money then
+
 				local distance =
 					promptPhysicalDistance(
 						prompt
@@ -2494,15 +2908,21 @@ local function getHighestMoneySteal()
 						and distance < bestDistance
 					)
 				then
+
 					best = prompt
 					bestMoney = money
 					bestDistance = distance
+
 				end
+
 			end
+
 		end
+
 	end
 
 	return best, bestMoney
+
 end
 
 
@@ -2516,20 +2936,23 @@ local stealGeneration = 0
 
 local progressShownAt = 0
 local lastRealHoldHeartbeat = 0
+
 local forceReacquire = false
 
 
 local function showProgress()
+
 	if not Progress.Visible then
-		progressShownAt =
-			os.clock()
+		progressShownAt = os.clock()
 	end
 
 	Progress.Visible = true
+
 end
 
 
 local function hideProgress()
+
 	Progress.Visible = false
 
 	ProgressFill.Size =
@@ -2540,33 +2963,38 @@ local function hideProgress()
 			0
 		)
 
-	ProgressPercent.Text =
-		"0%"
+	ProgressPercent.Text = "0%"
 
 	progressShownAt = 0
+
 end
 
 
 local function cancelCurrentHold()
+
 	stealGeneration += 1
 
 	if
 		currentPrompt
 		and currentPrompt.Parent
 	then
+
 		pcall(function()
 
 			currentPrompt:
 				InputHoldEnd()
 
 		end)
+
 	end
 
 	currentPrompt = nil
 	stealing = false
+
 	lastRealHoldHeartbeat = 0
 
 	hideProgress()
+
 end
 
 
@@ -2575,47 +3003,56 @@ end
 --========================================================
 
 local function waitForPromptReset(prompt)
+
 	if
 		not prompt
 		or not prompt.Parent
 	then
+
 		return
+
 	end
 
-	PromptBlocked[prompt] =
-		true
+	PromptBlocked[prompt] = true
 
-	local started =
-		os.clock()
-
-	local wentAway =
-		false
+	local started = os.clock()
+	local wentAway = false
 
 	while
 		prompt
 		and prompt.Parent
+
 		and os.clock()
 			- started
 			< RESET_TIMEOUT
 	do
+
 		if
 			not prompt.Enabled
+
 			or VisiblePrompts[prompt]
 				== false
 		then
+
 			wentAway = true
+
 		end
 
 		if wentAway then
+
 			if
 				prompt.Enabled
+
 				and VisiblePrompts[prompt]
 					~= false
+
 				and promptInRange(
 					prompt
 				)
 			then
+
 				break
+
 			end
 
 		elseif
@@ -2623,21 +3060,24 @@ local function waitForPromptReset(prompt)
 			- started
 			>= RESET_FALLBACK
 		then
+
 			break
+
 		end
 
 		task.wait(
 			0.015
 		)
+
 	end
 
-	PromptBlocked[prompt] =
-		nil
+	PromptBlocked[prompt] = nil
+
 end
 
 
 --========================================================
--- REAL HOLD
+-- REAL STEAL HOLD
 --========================================================
 
 local function performRealHold(
@@ -2645,12 +3085,17 @@ local function performRealHold(
 	mode,
 	money
 )
+
 	if stealing then
 		return
 	end
 
-	if not promptUsable(prompt) then
+	if not promptUsable(
+		prompt
+	) then
+
 		return
+
 	end
 
 	stealing = true
@@ -2665,48 +3110,25 @@ local function performRealHold(
 	local triggered = false
 
 	local holdBeganConnection =
-		nil
-
-	local triggerConnection =
-		nil
-
-	local hiddenConnection =
-		nil
-
-
-	holdBeganConnection =
 		prompt.PromptButtonHoldBegan:
 			Connect(function()
 
 				holdStarted = true
+
 				lastRealHoldHeartbeat =
 					os.clock()
 
 			end)
 
 
-	triggerConnection =
+	local triggerConnection =
 		prompt.Triggered:
 			Connect(function()
 
 				triggered = true
+
 				lastRealHoldHeartbeat =
 					os.clock()
-
-			end)
-
-
-	hiddenConnection =
-		prompt.AncestryChanged:
-			Connect(function(
-				_,
-				parent
-			)
-
-				if not parent then
-					lastRealHoldHeartbeat =
-						0
-				end
 
 			end)
 
@@ -2721,20 +3143,12 @@ local function performRealHold(
 
 
 	if not beginOK then
-		if holdBeganConnection then
-			holdBeganConnection:
-				Disconnect()
-		end
 
-		if triggerConnection then
-			triggerConnection:
-				Disconnect()
-		end
+		holdBeganConnection:
+			Disconnect()
 
-		if hiddenConnection then
-			hiddenConnection:
-				Disconnect()
-		end
+		triggerConnection:
+			Disconnect()
 
 		currentPrompt = nil
 		stealing = false
@@ -2745,6 +3159,7 @@ local function performRealHold(
 		)
 
 		return
+
 	end
 
 
@@ -2756,15 +3171,20 @@ local function performRealHold(
 	while
 		generation
 			== stealGeneration
+
 		and prompt
 		and prompt.Parent
+
 		and not holdStarted
 		and not triggered
+
 		and os.clock()
 			< startDeadline
 	do
+
 		RunService.Heartbeat:
 			Wait()
+
 	end
 
 
@@ -2772,6 +3192,7 @@ local function performRealHold(
 		not holdStarted
 		and not triggered
 	then
+
 		pcall(function()
 
 			prompt:
@@ -2779,30 +3200,21 @@ local function performRealHold(
 
 		end)
 
-		if holdBeganConnection then
-			holdBeganConnection:
-				Disconnect()
-		end
+		holdBeganConnection:
+			Disconnect()
 
-		if triggerConnection then
-			triggerConnection:
-				Disconnect()
-		end
-
-		if hiddenConnection then
-			hiddenConnection:
-				Disconnect()
-		end
+		triggerConnection:
+			Disconnect()
 
 		currentPrompt = nil
 		stealing = false
-		lastRealHoldHeartbeat = 0
 
 		hideProgress()
 
 		forceReacquire = true
 
 		return
+
 	end
 
 
@@ -2825,18 +3237,6 @@ local function performRealHold(
 		)
 
 
-	ProgressFill.Size =
-		UDim2.new(
-			0,
-			0,
-			1,
-			0
-		)
-
-	ProgressPercent.Text =
-		"0%"
-
-
 	local duration =
 		math.max(
 			tonumber(
@@ -2848,12 +3248,12 @@ local function performRealHold(
 		)
 
 
-	local holdStart =
+	local started =
 		os.clock()
 
 
 	local deadline =
-		holdStart
+		started
 		+ duration
 		+ HOLD_TRIGGER_GRACE
 
@@ -2872,23 +3272,26 @@ local function performRealHold(
 		and os.clock()
 			< deadline
 	do
+
 		lastRealHoldHeartbeat =
 			os.clock()
 
-		if
-			not promptInRange(
-				prompt
-			)
-		then
+
+		if not promptInRange(
+			prompt
+		) then
+
 			break
+
 		end
+
 
 		local pct =
 			math.clamp(
 
 				(
 					os.clock()
-					- holdStart
+					- started
 				)
 				/ duration,
 
@@ -2896,6 +3299,7 @@ local function performRealHold(
 				1
 
 			)
+
 
 		ProgressFill.Size =
 			UDim2.new(
@@ -2905,6 +3309,7 @@ local function performRealHold(
 				0
 			)
 
+
 		ProgressPercent.Text =
 			tostring(
 				math.floor(
@@ -2913,8 +3318,10 @@ local function performRealHold(
 			)
 			.. "%"
 
+
 		RunService.RenderStepped:
 			Wait()
+
 	end
 
 
@@ -2926,27 +3333,8 @@ local function performRealHold(
 	end)
 
 
-	if
-		not triggered
-		and prompt
-		and prompt.Parent
-	then
-		local finalDeadline =
-			os.clock()
-			+ 0.08
-
-		while
-			not triggered
-			and os.clock()
-				< finalDeadline
-		do
-			RunService.Heartbeat:
-				Wait()
-		end
-	end
-
-
 	if triggered then
+
 		ProgressFill.Size =
 			UDim2.new(
 				1,
@@ -2957,43 +3345,41 @@ local function performRealHold(
 
 		ProgressPercent.Text =
 			"100%"
+
 	end
 
 
-	if holdBeganConnection then
-		holdBeganConnection:
-			Disconnect()
-	end
+	holdBeganConnection:
+		Disconnect()
 
-	if triggerConnection then
-		triggerConnection:
-			Disconnect()
-	end
-
-	if hiddenConnection then
-		hiddenConnection:
-			Disconnect()
-	end
+	triggerConnection:
+		Disconnect()
 
 
 	currentPrompt = nil
 	stealing = false
+
 	lastRealHoldHeartbeat = 0
 
 	hideProgress()
 
 
 	if triggered then
+
 		waitForPromptReset(
 			prompt
 		)
+
 	else
+
 		forceReacquire = true
 
 		task.wait(
 			FAILED_HOLD_RETRY
 		)
+
 	end
+
 end
 
 
@@ -3002,7 +3388,9 @@ end
 --========================================================
 
 task.spawn(function()
+
 	while Gui.Parent do
+
 		local uiShowing =
 			Progress.Visible
 
@@ -3010,11 +3398,13 @@ task.spawn(function()
 			currentPrompt
 			and currentPrompt.Parent
 			and currentPrompt.Enabled
+
 			and promptInRange(
 				currentPrompt
 			)
 
-		local realHoldRecentlyAlive =
+
+		local realHoldAlive =
 			lastRealHoldHeartbeat > 0
 
 			and (
@@ -3026,7 +3416,9 @@ task.spawn(function()
 
 		if
 			uiShowing
+
 			and not stealing
+
 			and (
 				progressShownAt == 0
 
@@ -3035,11 +3427,17 @@ task.spawn(function()
 					>= STALE_UI_GRACE
 			)
 		then
+
 			hideProgress()
 
 			currentPrompt = nil
+
 			lastRealHoldHeartbeat = 0
-			forceReacquire = true
+
+			if nearestEnabled then
+				forceReacquire = true
+			end
+
 		end
 
 
@@ -3047,8 +3445,13 @@ task.spawn(function()
 			stealing
 			and not promptValid
 		then
+
 			cancelCurrentHold()
-			forceReacquire = true
+
+			if nearestEnabled then
+				forceReacquire = true
+			end
+
 		end
 
 
@@ -3056,44 +3459,56 @@ task.spawn(function()
 			uiShowing
 			and stealing
 			and promptValid
+
 			and progressShownAt > 0
 
 			and os.clock()
 				- progressShownAt
 				>= STALE_UI_GRACE
 
-			and not realHoldRecentlyAlive
+			and not realHoldAlive
 		then
+
 			cancelCurrentHold()
-			forceReacquire = true
+
+			if nearestEnabled then
+				forceReacquire = true
+			end
+
 		end
 
 
 		task.wait(
 			STEAL_WATCHDOG_RATE
 		)
+
 	end
+
 end)
 
 
 --========================================================
--- MAIN STEAL LOOP
+-- AUTO STEAL LOOP
 --========================================================
 
 task.spawn(function()
+
 	while Gui.Parent do
+
 		if not stealing then
 
 			if
 				forceReacquire
 				and nearestEnabled
 			then
+
 				forceReacquire = false
 
 				local prompt =
 					getNearestSteal()
 
 				if prompt then
+
 					performRealHold(
 						prompt,
 						"NEAREST STEAL",
@@ -3101,14 +3516,17 @@ task.spawn(function()
 							prompt
 						)
 					)
+
 				end
 
 
 			elseif nearestEnabled then
+
 				local prompt =
 					getNearestSteal()
 
 				if prompt then
+
 					performRealHold(
 						prompt,
 						"NEAREST STEAL",
@@ -3116,28 +3534,37 @@ task.spawn(function()
 							prompt
 						)
 					)
+
 				end
 
 
 			elseif highestEnabled then
+
 				local prompt,
 					money =
 					getHighestMoneySteal()
 
 				if prompt then
+
 					performRealHold(
 						prompt,
 						"HIGHEST MONEY",
 						money
 					)
+
 				end
+
 			end
+
 		end
+
 
 		task.wait(
 			STEAL_SCAN_RATE
 		)
+
 	end
+
 end)
 
 
@@ -3152,11 +3579,14 @@ NearestButton.MouseButton1Click:
 			not nearestEnabled
 
 		if nearestEnabled then
+
 			highestEnabled = false
 			forceReacquire = true
+
 		end
 
 		cancelCurrentHold()
+
 		updateButtons()
 
 	end)
@@ -3169,10 +3599,13 @@ HighestButton.MouseButton1Click:
 			not highestEnabled
 
 		if highestEnabled then
+
 			nearestEnabled = false
+
 		end
 
 		cancelCurrentHold()
+
 		updateButtons()
 
 	end)
@@ -3190,7 +3623,7 @@ AutoKickButton.MouseButton1Click:
 
 
 --========================================================
--- RADAR PANEL
+-- RADAR MENU
 --========================================================
 
 local RadarPanel =
@@ -3229,12 +3662,16 @@ RadarPanel.BackgroundColor3 =
 
 RadarPanel.BackgroundTransparency = 0.12
 RadarPanel.BorderSizePixel = 0
-RadarPanel.Parent = Gui
+
+RadarPanel.Parent =
+	Gui
+
 
 makeCorner(
 	RadarPanel,
 	16
 )
+
 
 makeStroke(
 	RadarPanel,
@@ -3269,7 +3706,9 @@ RadarTitle.Size =
 	)
 
 RadarTitle.BackgroundTransparency = 1
-RadarTitle.Text = "RADAR • 30 STUDS"
+
+RadarTitle.Text =
+	"RADAR • 30 STUDS"
 
 RadarTitle.TextColor3 =
 	Color3.fromRGB(
@@ -3282,8 +3721,12 @@ RadarTitle.Font =
 	Enum.Font.GothamBlack
 
 RadarTitle.TextSize = 16
-RadarTitle.TextXAlignment = Enum.TextXAlignment.Left
-RadarTitle.Parent = RadarPanel
+
+RadarTitle.TextXAlignment =
+	Enum.TextXAlignment.Left
+
+RadarTitle.Parent =
+	RadarPanel
 
 
 local RadarList =
@@ -3309,10 +3752,17 @@ RadarList.Size =
 
 RadarList.BackgroundTransparency = 1
 RadarList.BorderSizePixel = 0
+
 RadarList.ScrollBarThickness = 3
-RadarList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-RadarList.CanvasSize = UDim2.new()
-RadarList.Parent = RadarPanel
+
+RadarList.AutomaticCanvasSize =
+	Enum.AutomaticSize.Y
+
+RadarList.CanvasSize =
+	UDim2.new()
+
+RadarList.Parent =
+	RadarPanel
 
 
 local RadarLayout =
@@ -3331,7 +3781,7 @@ RadarLayout.Parent =
 
 
 --========================================================
--- RADAR CIRCLE
+-- RADAR WORLD CIRCLE
 --========================================================
 
 local RadarCircle =
@@ -3339,8 +3789,11 @@ local RadarCircle =
 		"Part"
 	)
 
-RadarCircle.Name = "PlayerRadar"
-RadarCircle.Shape = Enum.PartType.Cylinder
+RadarCircle.Name =
+	"PlayerRadar"
+
+RadarCircle.Shape =
+	Enum.PartType.Cylinder
 
 RadarCircle.Size =
 	Vector3.new(
@@ -3350,14 +3803,27 @@ RadarCircle.Size =
 	)
 
 RadarCircle.Anchored = true
+
 RadarCircle.CanCollide = false
 RadarCircle.CanTouch = false
 RadarCircle.CanQuery = false
+
 RadarCircle.CastShadow = false
-RadarCircle.Material = Enum.Material.SmoothPlastic
-RadarCircle.Color = Color3.new(1, 1, 1)
+
+RadarCircle.Material =
+	Enum.Material.SmoothPlastic
+
+RadarCircle.Color =
+	Color3.new(
+		1,
+		1,
+		1
+	)
+
 RadarCircle.Transparency = 0.7
-RadarCircle.Parent = WorldFolder
+
+RadarCircle.Parent =
+	WorldFolder
 
 
 --========================================================
@@ -3368,6 +3834,7 @@ local PlayerESP = {}
 
 
 local function setupPlayer(player)
+
 	if player == LP then
 		return
 	end
@@ -3378,8 +3845,7 @@ local function setupPlayer(player)
 
 	local data = {
 
-		Distance =
-			math.huge
+		Distance = math.huge
 
 	}
 
@@ -3388,6 +3854,7 @@ local function setupPlayer(player)
 
 
 	local function setupCharacter(character)
+
 		if data.Highlight then
 			data.Highlight:Destroy()
 		end
@@ -3406,6 +3873,7 @@ local function setupPlayer(player)
 		if not head then
 			return
 		end
+
 
 		local billboard =
 			Instance.new(
@@ -3448,12 +3916,26 @@ local function setupPlayer(player)
 			)
 
 		name.BackgroundTransparency = 1
-		name.Text = player.Name
-		name.TextColor3 = Color3.new(1, 1, 1)
+
+		name.Text =
+			player.Name
+
+		name.TextColor3 =
+			Color3.new(
+				1,
+				1,
+				1
+			)
+
 		name.TextStrokeTransparency = 0.12
-		name.Font = Enum.Font.GothamBlack
+
+		name.Font =
+			Enum.Font.GothamBlack
+
 		name.TextScaled = true
-		name.Parent = billboard
+
+		name.Parent =
+			billboard
 
 
 		local highlight =
@@ -3461,39 +3943,59 @@ local function setupPlayer(player)
 				"Highlight"
 			)
 
-		highlight.Adornee = character
-		highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+		highlight.Adornee =
+			character
+
+		highlight.DepthMode =
+			Enum.HighlightDepthMode.AlwaysOnTop
+
 		highlight.FillTransparency = 0.2
 		highlight.OutlineTransparency = 0
-		highlight.Enabled = false
-		highlight.Parent = character
 
-		data.Billboard = billboard
-		data.Name = name
-		data.Highlight = highlight
+		highlight.Enabled = false
+
+		highlight.Parent =
+			character
+
+
+		data.Billboard =
+			billboard
+
+		data.Name =
+			name
+
+		data.Highlight =
+			highlight
+
 	end
 
 
 	if player.Character then
+
 		task.spawn(
 			setupCharacter,
 			player.Character
 		)
+
 	end
+
 
 	player.CharacterAdded:
 		Connect(
 			setupCharacter
 		)
+
 end
 
 
 for _, player in ipairs(
 	Players:GetPlayers()
 ) do
+
 	setupPlayer(
 		player
 	)
+
 end
 
 
@@ -3510,6 +4012,7 @@ Players.PlayerRemoving:
 			PlayerESP[player]
 
 		if data then
+
 			if data.Highlight then
 				data.Highlight:Destroy()
 			end
@@ -3517,6 +4020,7 @@ Players.PlayerRemoving:
 			if data.Billboard then
 				data.Billboard:Destroy()
 			end
+
 		end
 
 		PlayerESP[player] = nil
@@ -3569,6 +4073,7 @@ RunService.Heartbeat:
 		for player, data in pairs(
 			PlayerESP
 		) do
+
 			local otherRoot =
 				player.Character
 
@@ -3577,21 +4082,23 @@ RunService.Heartbeat:
 						"HumanoidRootPart"
 					)
 
+
 			if
 				otherRoot
 				and data.Highlight
 			then
+
 				local distance =
 					(
 						otherRoot.Position
 						- root.Position
 					).Magnitude
 
-				data.Distance =
-					distance
+				data.Distance = distance
 
 
 				if distance <= RED_RANGE then
+
 					data.Highlight.Enabled = true
 
 					data.Highlight.FillColor =
@@ -3617,6 +4124,7 @@ RunService.Heartbeat:
 
 
 				elseif distance <= GREEN_RANGE then
+
 					data.Highlight.Enabled = true
 
 					data.Highlight.FillColor =
@@ -3642,6 +4150,7 @@ RunService.Heartbeat:
 
 
 				else
+
 					data.Highlight.Enabled = false
 
 					data.Name.TextColor3 =
@@ -3650,10 +4159,12 @@ RunService.Heartbeat:
 							1,
 							1
 						)
+
 				end
 
 
 				if distance <= GREEN_RANGE then
+
 					table.insert(
 						nearby,
 
@@ -3662,8 +4173,11 @@ RunService.Heartbeat:
 							Distance = distance
 						}
 					)
+
 				end
+
 			end
+
 		end
 
 
@@ -3672,7 +4186,9 @@ RunService.Heartbeat:
 			- lastRadarUpdate
 			< RADAR_LIST_RATE
 		then
+
 			return
+
 		end
 
 
@@ -3683,9 +4199,15 @@ RunService.Heartbeat:
 		for _, child in ipairs(
 			RadarList:GetChildren()
 		) do
-			if child:IsA("Frame") then
+
+			if child:IsA(
+				"Frame"
+			) then
+
 				child:Destroy()
+
 			end
+
 		end
 
 
@@ -3693,9 +4215,11 @@ RunService.Heartbeat:
 			nearby,
 
 			function(a, b)
+
 				return
 					a.Distance
 					< b.Distance
+
 			end
 		)
 
@@ -3703,6 +4227,7 @@ RunService.Heartbeat:
 		for _, info in ipairs(
 			nearby
 		) do
+
 			local row =
 				Instance.new(
 					"Frame"
@@ -3725,7 +4250,10 @@ RunService.Heartbeat:
 
 			row.BackgroundTransparency = 0.1
 			row.BorderSizePixel = 0
-			row.Parent = RadarList
+
+			row.Parent =
+				RadarList
+
 
 			makeCorner(
 				row,
@@ -3765,27 +4293,39 @@ RunService.Heartbeat:
 				)
 				.. " studs"
 
-			text.Font = Enum.Font.GothamBold
+			text.Font =
+				Enum.Font.GothamBold
+
 			text.TextSize = 13
-			text.TextXAlignment = Enum.TextXAlignment.Left
+
+			text.TextXAlignment =
+				Enum.TextXAlignment.Left
+
 
 			if info.Distance <= RED_RANGE then
+
 				text.TextColor3 =
 					Color3.fromRGB(
 						255,
 						65,
 						65
 					)
+
 			else
+
 				text.TextColor3 =
 					Color3.fromRGB(
 						75,
 						255,
 						100
 					)
+
 			end
 
-			text.Parent = row
+
+			text.Parent =
+				row
+
 		end
 
 	end)
@@ -3801,15 +4341,22 @@ local BaseBeam = nil
 
 
 local function findOwnerBase()
+
 	local owner =
 		OWNER_NAME:lower()
 
 	for _, gui in ipairs(
 		workspace:GetDescendants()
 	) do
+
 		if
-			gui:IsA("BillboardGui")
-			or gui:IsA("SurfaceGui")
+			gui:IsA(
+				"BillboardGui"
+			)
+
+			or gui:IsA(
+				"SurfaceGui"
+			)
 		then
 
 			for _, object in ipairs(
@@ -3818,8 +4365,13 @@ local function findOwnerBase()
 
 				if
 					(
-						object:IsA("TextLabel")
-						or object:IsA("TextButton")
+						object:IsA(
+							"TextLabel"
+						)
+
+						or object:IsA(
+							"TextButton"
+						)
 					)
 
 					and tostring(
@@ -3842,21 +4394,29 @@ local function findOwnerBase()
 					if part then
 						return part
 					end
+
 				end
+
 			end
+
 		end
+
 	end
 
 	return nil
+
 end
 
 
 local function setupBase(part)
+
 	if
 		BasePart == part
 		and BaseBeam
 	then
+
 		return
+
 	end
 
 	if BaseBeam then
@@ -3867,8 +4427,7 @@ local function setupBase(part)
 		BaseAttachment:Destroy()
 	end
 
-	BasePart =
-		part
+	BasePart = part
 
 	BaseAttachment =
 		Instance.new(
@@ -3897,8 +4456,10 @@ local function setupBase(part)
 		BaseAttachment
 
 	BaseBeam.FaceCamera = true
+
 	BaseBeam.Width0 = 0.65
 	BaseBeam.Width1 = 0.65
+
 	BaseBeam.LightEmission = 0.6
 
 	BaseBeam.Color =
@@ -3912,11 +4473,14 @@ local function setupBase(part)
 
 	BaseBeam.Parent =
 		WorldFolder
+
 end
 
 
 task.spawn(function()
+
 	while Gui.Parent do
+
 		if
 			not BasePart
 			or not BasePart.Parent
@@ -3926,27 +4490,34 @@ task.spawn(function()
 				findOwnerBase()
 
 			if part then
+
 				setupBase(
 					part
 				)
+
 			end
+
 		end
 
-		local attachment =
+		local rootAttachment =
 			getRootAttachment()
 
 		if
 			BaseBeam
-			and attachment
+			and rootAttachment
 		then
+
 			BaseBeam.Attachment0 =
-				attachment
+				rootAttachment
+
 		end
 
 		task.wait(
 			1
 		)
+
 	end
+
 end)
 
 
@@ -3959,11 +4530,14 @@ local WatchedUI = {}
 
 
 local function checkYouStole(text)
+
 	if
 		not autoKickEnabled
 		or kickTriggered
 	then
+
 		return
+
 	end
 
 	if typeof(text) ~= "string" then
@@ -3985,24 +4559,33 @@ local function checkYouStole(text)
 		LP:Kick(
 			"You stole"
 		)
+
 	end
+
 end
 
 
 local function watchUI(object)
+
 	if WatchedUI[object] then
 		return
 	end
 
 	if
-		not object:IsA("TextLabel")
-		and not object:IsA("TextButton")
+		not object:IsA(
+			"TextLabel"
+		)
+
+		and not object:IsA(
+			"TextButton"
+		)
 	then
+
 		return
+
 	end
 
-	WatchedUI[object] =
-		true
+	WatchedUI[object] = true
 
 	checkYouStole(
 		object.Text
@@ -4019,15 +4602,18 @@ local function watchUI(object)
 			)
 
 		end)
+
 end
 
 
 for _, object in ipairs(
 	PlayerGui:GetDescendants()
 ) do
+
 	watchUI(
 		object
 	)
+
 end
 
 
@@ -4042,19 +4628,20 @@ PlayerGui.DescendantAdded:
 --========================================================
 
 local hopping = false
+
 local visitedServers = {}
 local failedServers = {}
 
 
 local function httpGet(url)
+
 	local ok,
 		result =
 		pcall(function()
 
-			return
-				game:HttpGet(
-					url
-				)
+			return game:HttpGet(
+				url
+			)
 
 		end)
 
@@ -4062,9 +4649,10 @@ local function httpGet(url)
 		ok
 		and result
 	then
-		return result
-	end
 
+		return result
+
+	end
 
 	local req =
 		request
@@ -4075,6 +4663,7 @@ local function httpGet(url)
 		)
 
 	if type(req) == "function" then
+
 		local success,
 			response =
 			pcall(function()
@@ -4093,15 +4682,20 @@ local function httpGet(url)
 			and response
 			and response.Body
 		then
+
 			return response.Body
+
 		end
+
 	end
 
 	return nil
+
 end
 
 
 local function getServers()
+
 	local candidates = {}
 	local seen = {}
 
@@ -4109,9 +4703,11 @@ local function getServers()
 		"Asc",
 		"Desc"
 	}) do
+
 		local cursor = nil
 
 		for _ = 1, 6 do
+
 			local url =
 				"https://games.roblox.com/v1/games/"
 				.. tostring(
@@ -4122,12 +4718,14 @@ local function getServers()
 				.. "&limit=100"
 
 			if cursor then
+
 				url ..=
 					"&cursor="
 					.. HttpService:
 						UrlEncode(
 							cursor
 						)
+
 			end
 
 			local body =
@@ -4155,13 +4753,16 @@ local function getServers()
 				not decodeOK
 				or not data
 			then
+
 				break
+
 			end
 
 			for _, server in ipairs(
 				data.data
 				or {}
 			) do
+
 				local id =
 					server.id
 
@@ -4177,21 +4778,31 @@ local function getServers()
 
 				if
 					id
+
 					and id ~= game.JobId
+
 					and not seen[id]
+
 					and not visitedServers[id]
+
 					and not failedServers[id]
+
 					and playing
+
 					and maxPlayers
+
 					and playing < maxPlayers
 				then
+
 					seen[id] = true
 
 					table.insert(
 						candidates,
 						server
 					)
+
 				end
+
 			end
 
 			cursor =
@@ -4201,16 +4812,22 @@ local function getServers()
 				not cursor
 				or #candidates >= 120
 			then
+
 				break
+
 			end
+
 		end
+
 	end
 
 	return candidates
+
 end
 
 
 local function serverHop()
+
 	if hopping then
 		return
 	end
@@ -4224,11 +4841,14 @@ local function serverHop()
 
 
 	task.spawn(function()
+
 		for _ = 1, 15 do
+
 			local servers =
 				getServers()
 
 			if #servers == 0 then
+
 				visitedServers = {}
 
 				task.wait(
@@ -4236,6 +4856,7 @@ local function serverHop()
 				)
 
 				continue
+
 			end
 
 			local server =
@@ -4249,8 +4870,7 @@ local function serverHop()
 
 			visitedServers[
 				server.id
-			] =
-				true
+			] = true
 
 			HopButton.Text =
 				"HOPPING..."
@@ -4268,21 +4888,28 @@ local function serverHop()
 				end)
 
 			if success then
+
 				task.wait(
 					TELEPORT_TIMEOUT
 				)
+
 			else
+
 				failedServers[
 					server.id
-				] =
-					true
+				] = true
+
 			end
+
 		end
 
 		hopping = false
+
 		HopButton.Text = "HOP"
 		HopButton.TextSize = 25
+
 	end)
+
 end
 
 
@@ -4306,21 +4933,30 @@ UserInputService.InputBegan:
 			input.KeyCode
 			== Enum.KeyCode.Z
 		then
+
 			serverHop()
+
 		end
 
 	end)
 
 
 --========================================================
--- MOBILE MENU SCALING
+-- MOBILE UI
 --
--- IMPORTANT:
--- BUTTON HOLDERS ARE NOT SCALED.
--- ONLY MENUS ARE SCALED.
+-- MENUS = 50%
+--
+-- HOP BUTTON:
+-- TOP-MIDDLE ON PHONE
+--
+-- OTHER BUTTONS:
+-- REMAIN NORMAL SIZE
 --========================================================
 
-local function addMobileScale(guiObject)
+local function addMobileScale(
+	guiObject
+)
+
 	if not guiObject then
 		return
 	end
@@ -4348,28 +4984,32 @@ local function addMobileScale(guiObject)
 
 	scale.Parent =
 		guiObject
+
 end
 
 
 local function setupMobileUI()
+
 	if not UserInputService.TouchEnabled then
 		return
 	end
 
 
 	--====================================================
-	-- BRAINROT MENU -> 50%
+	-- BRAINROT MENU = 50%
 	--====================================================
 
 	addMobileScale(
 		BrainrotPanel
 	)
 
+
 	BrainrotPanel.AnchorPoint =
 		Vector2.new(
 			1,
 			0.5
 		)
+
 
 	BrainrotPanel.Position =
 		UDim2.new(
@@ -4381,18 +5021,20 @@ local function setupMobileUI()
 
 
 	--====================================================
-	-- RADAR MENU -> 50%
+	-- RADAR MENU = 50%
 	--====================================================
 
 	addMobileScale(
 		RadarPanel
 	)
 
+
 	RadarPanel.AnchorPoint =
 		Vector2.new(
 			1,
 			0.5
 		)
+
 
 	RadarPanel.Position =
 		UDim2.new(
@@ -4404,12 +5046,13 @@ local function setupMobileUI()
 
 
 	--====================================================
-	-- STEAL PROGRESS MENU -> 50%
+	-- TOP STEAL PROGRESS = 50%
 	--====================================================
 
 	addMobileScale(
 		Progress
 	)
+
 
 	Progress.AnchorPoint =
 		Vector2.new(
@@ -4417,37 +5060,127 @@ local function setupMobileUI()
 			0
 		)
 
+
 	Progress.Position =
 		UDim2.new(
 			0.5,
 			0,
 			0,
-			15
+			100
 		)
 
 
 	--====================================================
-	-- THESE ARE INTENTIONALLY NOT SCALED:
+	-- MOBILE HOP BUTTON
 	--
-	-- HopHolder
-	-- NearestHolder
-	-- HighestHolder
-	-- AutoKickHolder
+	-- MOVE TO TOP MIDDLE.
 	--
-	-- They stay exactly their normal/full size.
+	-- It no longer sits near the bottom-right
+	-- Roblox jump button.
 	--====================================================
 
+	HopHolder.AnchorPoint =
+		Vector2.new(
+			0.5,
+			0
+		)
+
+
+	HopHolder.Position =
+		UDim2.new(
+			0.5,
+			0,
+			0,
+			28
+		)
+
+
+	-- Same size as normal.
+	HopHolder.Size =
+		UDim2.new(
+			0,
+			160,
+			0,
+			58
+		)
+
+
+	--====================================================
+	-- KEEP THESE FULL SIZE / BOTTOM RIGHT:
+	--
+	-- Nearest Steal
+	-- Highest Money Steal
+	-- Auto Kick
+	--====================================================
+
+	NearestHolder.AnchorPoint =
+		Vector2.new(
+			1,
+			1
+		)
+
+
+	NearestHolder.Position =
+		UDim2.new(
+			1,
+			-24,
+			1,
+			-24
+		)
+
+
+	HighestHolder.AnchorPoint =
+		Vector2.new(
+			1,
+			1
+		)
+
+
+	HighestHolder.Position =
+		UDim2.new(
+			1,
+			-24,
+			1,
+			-80
+		)
+
+
+	AutoKickHolder.AnchorPoint =
+		Vector2.new(
+			1,
+			1
+		)
+
+
+	AutoKickHolder.Position =
+		UDim2.new(
+			1,
+			-24,
+			1,
+			-136
+		)
+
+
 	print(
-		"[FTX] MOBILE DETECTED"
+		"[FTX] PHONE UI ENABLED"
 	)
 
 	print(
-		"[FTX] Menus scaled to 50%"
+		"[FTX] Hop moved to top-middle"
 	)
 
 	print(
-		"[FTX] Buttons remain 100%"
+		"[FTX] Hop no longer blocks jump button"
 	)
+
+	print(
+		"[FTX] Menus = 50%"
+	)
+
+	print(
+		"[FTX] Buttons = 100%"
+	)
+
 end
 
 
@@ -4465,7 +5198,12 @@ LP.CharacterAdded:
 
 		cancelCurrentHold()
 
-		forceReacquire = true
+		-- Nearest starts OFF, so don't force it on.
+		if nearestEnabled then
+			forceReacquire = true
+		else
+			forceReacquire = false
+		end
 
 	end)
 
@@ -4479,11 +5217,11 @@ print(
 )
 
 print(
-	"[FTX] Nearest Steal default = ON"
+	"[FTX] Nearest Steal default = OFF"
 )
 
 print(
-	"[FTX] Stuck-steal watchdog = ON"
+	"[FTX] Highest Money default = OFF"
 )
 
 print(
@@ -4491,7 +5229,7 @@ print(
 )
 
 print(
-	"[FTX] Brainrot ESP/list = $20M/s+"
+	"[FTX] ESP minimum = $20M/s"
 )
 
 print(
@@ -4499,7 +5237,11 @@ print(
 )
 
 print(
-	"[FTX] Mobile buttons = 100%"
+	"[FTX] Mobile Hop = TOP MIDDLE"
+)
+
+print(
+	"[FTX] Mobile Hop avoids jump button"
 )
 
 print(

@@ -4279,11 +4279,3 @@ end)
 --========================================================
 
 refreshButtons()
-
-print("[FTX] LOADED")
-print("[FTX] AUTO HOP WAIT = 1 SECOND")
-print("[FTX] CURRENT SERVER =", game.JobId)
-print("[FTX] HOPPER CURRENT-JOB PROTECTION = ON")
-print("[FTX] FAILED TARGET RETRY = ON")
-print("[FTX] $20M SOUND =", GOOD_SOUND_ID)
-print("[FTX] SETTINGS SAVE =", canSave)

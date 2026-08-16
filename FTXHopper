@@ -1,378 +1,139 @@
 --========================================================
--- FTX ALL-IN-ONE
---
--- FULL VERSION
---
--- MAIN FEATURES:
--- • Standalone HOP button
--- • Z = server hop
--- • Main controls menu
--- • Main menu draggable
--- • Main menu closable / reopenable
--- • Radar menu draggable
--- • Radar menu closable / reopenable
--- • Brainrot menu draggable
--- • Brainrot menu closable / reopenable
---
--- SAVED:
--- • Toggle states
--- • Menu positions
--- • Menu open/closed states
--- • Recent server JobIds
---
--- AUTO HOP:
--- • Waits minimum 1 second after joining
--- • Waits for world/money UI to actually begin loading
--- • Finds $20M/sec+
--- • Stops Auto Hop when $20M/sec+ found
--- • Manual re-enable forces another hop
--- • Avoids current server
--- • Avoids recently used servers
--- • Avoids full servers
--- • Failed hops automatically retry
--- • Recent list rotates so it cannot remain stuck forever
---
--- SOUND:
--- • Plays 103185549195508 when a NEW $20M/sec+
---   target appears
---
--- PHONE:
--- • Menus 50%
--- • HOP top middle
---
--- PC:
--- • Menus full size
--- • HOP bottom right
---========================================================
-
-
---========================================================
--- LOAD
+-- FTX ALL-IN-ONE - FIXED SERVER HOP
 --========================================================
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
 
-
 --========================================================
 -- SERVICES
 --========================================================
 
-local Players =
-	game:GetService("Players")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+local UserInputService = game:GetService("UserInputService")
+local ProximityPromptService = game:GetService("ProximityPromptService")
+local SoundService = game:GetService("SoundService")
+local CoreGui = game:GetService("CoreGui")
 
-local RunService =
-	game:GetService("RunService")
+local LP = Players.LocalPlayer
+local PlayerGui = LP:WaitForChild("PlayerGui")
 
-local TweenService =
-	game:GetService("TweenService")
-
-local TeleportService =
-	game:GetService("TeleportService")
-
-local HttpService =
-	game:GetService("HttpService")
-
-local UserInputService =
-	game:GetService("UserInputService")
-
-local ProximityPromptService =
-	game:GetService("ProximityPromptService")
-
-local SoundService =
-	game:GetService("SoundService")
-
-local CoreGui =
-	game:GetService("CoreGui")
-
-
-local LP =
-	Players.LocalPlayer
-
-
-while not LP do
-	task.wait()
-
-	LP =
-		Players.LocalPlayer
-end
-
-
-local PlayerGui =
-	LP:FindFirstChildOfClass(
-		"PlayerGui"
-	)
-
-
-while not PlayerGui do
-	task.wait()
-
-	PlayerGui =
-		LP:FindFirstChildOfClass(
-			"PlayerGui"
-		)
-end
-
-
-local RNG =
-	Random.new()
-
-
-local SERVER_JOINED_AT =
-	os.clock()
-
+local RNG = Random.new()
+local JOIN_TIME = os.clock()
 
 --========================================================
 -- CONFIG
 --========================================================
 
-local TARGET_PLACE_ID =
-	109983668079237
+local TARGET_PLACE_ID = 109983668079237
+local OWNER_NAME = "チキンバナナ"
 
+local MIN_MONEY = 20_000_000
 
-local OWNER_NAME =
-	"チキンバナナ"
+local GREEN_RANGE = 30
+local RED_RANGE = 20
 
+local AUTO_HOP_JOIN_WAIT = 1
 
-local MIN_MONEY =
-	20_000_000
+local MONEY_SCAN_INTERVAL = 5
+local RADAR_UPDATE_INTERVAL = 0.15
+local BRAINROT_LIST_INTERVAL = 0.75
 
-
-local GREEN_RANGE =
-	30
-
-
-local RED_RANGE =
-	20
-
-
-local MONEY_RESCAN_RATE =
-	5
-
-
-local BRAINROT_LIST_RATE =
-	0.75
-
-
-local RADAR_LIST_RATE =
-	0.15
-
-
-local STEAL_SCAN_RATE =
-	0.025
-
-
-local HOLD_START_TIMEOUT =
-	0.20
-
-
-local HOLD_TRIGGER_GRACE =
-	0.50
-
-
-local FAILED_HOLD_RETRY =
-	0.05
-
-
-local RESET_FALLBACK =
-	0.18
-
-
---========================================================
--- AUTO HOP
---========================================================
-
-local AUTO_HOP_JOIN_WAIT =
-	1
-
-
-local DATA_READY_TIMEOUT =
-	12
-
-
-local AUTO_HOP_LOOP_RATE =
-	0.15
-
-
-local MAX_RECENT_SERVERS =
-	150
-
-
-local SERVER_SEARCH_PAGES =
-	12
-
-
-local SERVER_SEARCH_TIMEOUT =
-	4
-
-
-local TELEPORT_WATCHDOG =
-	3
-
-
-local HOP_RETRY_DELAY =
-	0.12
-
-
-local NO_SERVER_RETRY =
-	0.15
-
-
---========================================================
--- MOBILE
---========================================================
-
-local MOBILE_MENU_SCALE =
-	0.5
-
-
---========================================================
--- SAVE
---========================================================
-
-local SAVE_FILE =
-	"FTX_AllInOne_Settings.json"
-
-
---========================================================
--- SOUND
---========================================================
+local SAVE_FILE = "FTX_AllInOne_Settings.json"
 
 local GOOD_SOUND_ID =
 	"rbxassetid://103185549195508"
 
+local MOBILE_MENU_SCALE = 0.5
+
+-- Hopper settings
+
+local SERVER_PAGE_LIMIT = 100
+local SERVER_PAGES_PER_SEARCH = 10
+
+local HOP_WATCHDOG = 4
+local HOP_RETRY_DELAY = 0.15
+
+local MAX_RECENT_SERVERS = 50
 
 --========================================================
--- DEFAULT SETTINGS
+-- SAVE DATA
 --========================================================
 
 local Saved = {
 
-	NearestSteal =
-		false,
+	NearestSteal = false,
+	HighestMoney = false,
 
-	HighestMoney =
-		false,
+	AutoKick = true,
+	AutoHop = false,
 
-	AutoKick =
-		true,
+	RadarCircle = true,
+	PlayerHighlight = true,
 
-	AutoHop =
-		false,
+	MainMenuOpen = true,
+	RadarMenuOpen = true,
+	BrainrotMenuOpen = true,
 
-	RadarCircle =
-		true,
-
-	PlayerHighlight =
-		true,
-
-
-	MainMenuOpen =
-		true,
-
-	RadarMenuOpen =
-		true,
-
-	BrainrotMenuOpen =
-		true,
-
+	RecentServers = {},
 
 	MainMenuPosition = {
-
 		XScale = 0,
 		XOffset = 20,
-
 		YScale = 0.5,
-		YOffset = -140
-
+		YOffset = -150
 	},
-
 
 	RadarMenuPosition = {
-
 		XScale = 1,
 		XOffset = -20,
-
 		YScale = 0.5,
 		YOffset = 0
-
 	},
-
 
 	BrainrotMenuPosition = {
-
 		XScale = 1,
 		XOffset = -275,
-
 		YScale = 0.5,
 		YOffset = 0
-
-	},
-
-
-	RecentServers =
-		{}
+	}
 
 }
 
-
---========================================================
--- SAVE SUPPORT
---========================================================
-
 local canSave =
+	typeof(writefile) == "function"
+	and typeof(readfile) == "function"
+	and typeof(isfile) == "function"
 
-	typeof(writefile)
-	== "function"
+local function mergeTable(a, b)
 
-	and typeof(readfile)
-	== "function"
-
-	and typeof(isfile)
-	== "function"
-
-
-local function mergeSettings(
-	target,
-	source
-)
-
-	if type(source) ~= "table" then
+	if type(b) ~= "table" then
 		return
 	end
 
-
-	for key, value in pairs(
-		source
-	) do
+	for k, v in pairs(b) do
 
 		if
-			type(value)
-				== "table"
-
-			and type(
-				target[key]
-			)
-				== "table"
+			type(v) == "table"
+			and type(a[k]) == "table"
 		then
 
-			mergeSettings(
-				target[key],
-				value
-			)
+			mergeTable(a[k], v)
 
 		else
 
-			target[key] =
-				value
+			a[k] = v
 
 		end
 
 	end
 
 end
-
 
 local function loadSettings()
 
@@ -380,40 +141,25 @@ local function loadSettings()
 		return
 	end
 
-
 	pcall(function()
 
-		if not isfile(
-			SAVE_FILE
-		) then
-
+		if not isfile(SAVE_FILE) then
 			return
-
 		end
 
+		local raw = readfile(SAVE_FILE)
 
-		local raw =
-			readfile(
-				SAVE_FILE
-			)
+		local decoded =
+			HttpService:JSONDecode(raw)
 
-
-		local data =
-			HttpService:
-				JSONDecode(
-					raw
-				)
-
-
-		mergeSettings(
+		mergeTable(
 			Saved,
-			data
+			decoded
 		)
 
 	end)
 
 end
-
 
 local function saveSettings()
 
@@ -421,242 +167,49 @@ local function saveSettings()
 		return
 	end
 
-
 	pcall(function()
 
 		writefile(
-
 			SAVE_FILE,
-
-			HttpService:
-				JSONEncode(
-					Saved
-				)
-
+			HttpService:JSONEncode(Saved)
 		)
 
 	end)
 
 end
 
-
+-- LOAD IMMEDIATELY
 loadSettings()
-
-
-if type(
-	Saved.RecentServers
-) ~= "table" then
-
-	Saved.RecentServers =
-		{}
-
-end
-
 
 --========================================================
 -- POSITION HELPERS
 --========================================================
 
-local function positionToTable(
-	position
-)
+local function savePos(p)
 
 	return {
-
-		XScale =
-			position.X.Scale,
-
-		XOffset =
-			position.X.Offset,
-
-		YScale =
-			position.Y.Scale,
-
-		YOffset =
-			position.Y.Offset
-
+		XScale = p.X.Scale,
+		XOffset = p.X.Offset,
+		YScale = p.Y.Scale,
+		YOffset = p.Y.Offset
 	}
 
 end
 
-
-local function tableToPosition(
-	data,
-	fallback
-)
+local function loadPos(data, default)
 
 	if type(data) ~= "table" then
-		return fallback
+		return default
 	end
-
 
 	return UDim2.new(
-
-		tonumber(
-			data.XScale
-		)
-		or fallback.X.Scale,
-
-		tonumber(
-			data.XOffset
-		)
-		or fallback.X.Offset,
-
-		tonumber(
-			data.YScale
-		)
-		or fallback.Y.Scale,
-
-		tonumber(
-			data.YOffset
-		)
-		or fallback.Y.Offset
-
+		tonumber(data.XScale) or default.X.Scale,
+		tonumber(data.XOffset) or default.X.Offset,
+		tonumber(data.YScale) or default.Y.Scale,
+		tonumber(data.YOffset) or default.Y.Offset
 	)
 
 end
-
-
---========================================================
--- RECENT SERVER SYSTEM
---========================================================
-
-local recentServers =
-	{}
-
-
-local recentOrder =
-	{}
-
-
-local function rebuildRecentServers()
-
-	recentServers =
-		{}
-
-
-	recentOrder =
-		{}
-
-
-	for _, id in ipairs(
-		Saved.RecentServers
-	) do
-
-		if
-			type(id) == "string"
-
-			and id ~= ""
-		then
-
-			if not recentServers[id] then
-
-				recentServers[id] =
-					true
-
-
-				table.insert(
-					recentOrder,
-					id
-				)
-
-			end
-
-		end
-
-	end
-
-end
-
-
-rebuildRecentServers()
-
-
-local function saveRecentServers()
-
-	Saved.RecentServers =
-		recentOrder
-
-
-	saveSettings()
-
-end
-
-
-local function rememberServer(
-	id
-)
-
-	if
-		not id
-		or id == ""
-	then
-
-		return
-
-	end
-
-
-	id =
-		tostring(
-			id
-		)
-
-
-	if recentServers[
-		id
-	] then
-
-		return
-
-	end
-
-
-	recentServers[
-		id
-	] =
-		true
-
-
-	table.insert(
-		recentOrder,
-		id
-	)
-
-
-	while
-		#recentOrder
-		> MAX_RECENT_SERVERS
-	do
-
-		local removed =
-			table.remove(
-				recentOrder,
-				1
-			)
-
-
-		if removed then
-
-			recentServers[
-				removed
-			] =
-				nil
-
-		end
-
-	end
-
-
-	saveRecentServers()
-
-end
-
-
-rememberServer(
-	game.JobId
-)
-
 
 --========================================================
 -- CLEAN OLD
@@ -665,248 +218,99 @@ rememberServer(
 pcall(function()
 
 	local old =
-		CoreGui:
-			FindFirstChild(
-				"FTX_AllInOne"
-			)
-
+		CoreGui:FindFirstChild(
+			"FTX_AllInOne"
+		)
 
 	if old then
 		old:Destroy()
 	end
 
 end)
-
 
 pcall(function()
 
 	local old =
-		workspace:
-			FindFirstChild(
-				"FTX_WORLD"
-			)
-
+		workspace:FindFirstChild(
+			"FTX_WORLD"
+		)
 
 	if old then
 		old:Destroy()
 	end
 
 end)
-
 
 --========================================================
 -- GUI ROOT
 --========================================================
 
-local Gui =
-	Instance.new(
-		"ScreenGui"
-	)
+local Gui = Instance.new("ScreenGui")
 
-Gui.Name =
-	"FTX_AllInOne"
+Gui.Name = "FTX_AllInOne"
+Gui.ResetOnSpawn = false
+Gui.IgnoreGuiInset = true
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
-Gui.IgnoreGuiInset =
-	true
+Gui.Parent = CoreGui
 
-Gui.ResetOnSpawn =
-	false
+local WorldFolder = Instance.new("Folder")
 
-Gui.ZIndexBehavior =
-	Enum.ZIndexBehavior.Sibling
+WorldFolder.Name = "FTX_WORLD"
+WorldFolder.Parent = workspace
 
-Gui.Parent =
-	CoreGui
+local ESPFolder = Instance.new("Folder")
 
-
-local WorldFolder =
-	Instance.new(
-		"Folder"
-	)
-
-WorldFolder.Name =
-	"FTX_WORLD"
-
-WorldFolder.Parent =
-	workspace
-
-
-local ESPFolder =
-	Instance.new(
-		"Folder"
-	)
-
-ESPFolder.Name =
-	"BrainrotESP"
-
-ESPFolder.Parent =
-	Gui
-
+ESPFolder.Name = "FTX_ESP"
+ESPFolder.Parent = Gui
 
 --========================================================
--- SOUND
+-- HELPERS
 --========================================================
 
-local GoodSound =
-	Instance.new(
-		"Sound"
-	)
+local function corner(parent, r)
 
-GoodSound.Name =
-	"FTX_GOOD_SOUND"
-
-GoodSound.SoundId =
-	GOOD_SOUND_ID
-
-GoodSound.Volume =
-	2
-
-GoodSound.Parent =
-	SoundService
-
-
-local lastSoundTime =
-	0
-
-
-local function playGoodSound()
-
-	if
-		os.clock()
-		- lastSoundTime
-		< 0.25
-	then
-
-		return
-
-	end
-
-
-	lastSoundTime =
-		os.clock()
-
-
-	pcall(function()
-
-		GoodSound.TimePosition =
-			0
-
-
-		GoodSound:
-			Play()
-
-	end)
-
-end
-
-
---========================================================
--- UI HELPERS
---========================================================
-
-local function corner(
-	parent,
-	radius
-)
-
-	local c =
-		Instance.new(
-			"UICorner"
-		)
-
+	local c = Instance.new("UICorner")
 
 	c.CornerRadius =
-		UDim.new(
-			0,
-			radius
-			or 12
-		)
+		UDim.new(0, r or 12)
 
-
-	c.Parent =
-		parent
-
+	c.Parent = parent
 
 	return c
 
 end
 
+local function stroke(parent, size, color)
 
-local function stroke(
-	parent,
-	thickness,
-	color
-)
+	local s = Instance.new("UIStroke")
 
-	local s =
-		Instance.new(
-			"UIStroke"
-		)
-
-
-	s.Thickness =
-		thickness
-		or 2
-
-
+	s.Thickness = size or 2
 	s.Color =
 		color
 		or Color3.fromRGB(
-			90,
-			90,
-			95
+			80,
+			80,
+			90
 		)
 
-
-	s.Parent =
-		parent
-
+	s.Parent = parent
 
 	return s
 
 end
 
+local function addScale(parent, value)
 
-local function addScale(
-	object,
-	name,
-	value
-)
+	local scale =
+		Instance.new("UIScale")
 
-	local old =
-		object:
-			FindFirstChild(
-				name
-			)
+	scale.Scale = value
+	scale.Parent = parent
 
-
-	if old then
-		old:Destroy()
-	end
-
-
-	local s =
-		Instance.new(
-			"UIScale"
-		)
-
-
-	s.Name =
-		name
-
-
-	s.Scale =
-		value
-
-
-	s.Parent =
-		object
-
-
-	return s
+	return scale
 
 end
-
 
 --========================================================
 -- DRAG
@@ -918,187 +322,138 @@ local function makeDraggable(
 	saveKey
 )
 
-	local dragging =
-		false
+	local dragging = false
+	local dragStart
+	local startPos
 
+	handle.InputBegan:Connect(function(input)
 
-	local dragStart =
-		nil
+		if
+			input.UserInputType
+				== Enum.UserInputType.MouseButton1
+			or input.UserInputType
+				== Enum.UserInputType.Touch
+		then
 
+			dragging = true
+			dragStart = input.Position
+			startPos = panel.Position
 
-	local panelStart =
-		nil
+		end
 
+	end)
 
-	handle.InputBegan:
-		Connect(function(input)
+	handle.InputEnded:Connect(function(input)
 
-			if
-				input.UserInputType
-					== Enum.UserInputType.MouseButton1
+		if
+			input.UserInputType
+				== Enum.UserInputType.MouseButton1
+			or input.UserInputType
+				== Enum.UserInputType.Touch
+		then
 
-				or input.UserInputType
-					== Enum.UserInputType.Touch
-			then
+			if dragging then
 
-				dragging =
-					true
+				dragging = false
 
+				if saveKey then
 
-				dragStart =
-					input.Position
+					Saved[saveKey] =
+						savePos(
+							panel.Position
+						)
 
-
-				panelStart =
-					panel.Position
-
-			end
-
-		end)
-
-
-	handle.InputEnded:
-		Connect(function(input)
-
-			if
-				input.UserInputType
-					== Enum.UserInputType.MouseButton1
-
-				or input.UserInputType
-					== Enum.UserInputType.Touch
-			then
-
-				if dragging then
-
-					dragging =
-						false
-
-
-					if saveKey then
-
-						Saved[
-							saveKey
-						] =
-							positionToTable(
-								panel.Position
-							)
-
-
-						saveSettings()
-
-					end
+					saveSettings()
 
 				end
 
 			end
 
-		end)
+		end
 
+	end)
 
-	UserInputService.InputChanged:
-		Connect(function(input)
+	UserInputService.InputChanged:Connect(function(input)
 
-			if not dragging then
-				return
-			end
+		if not dragging then
+			return
+		end
 
+		if
+			input.UserInputType
+				~= Enum.UserInputType.MouseMovement
+			and input.UserInputType
+				~= Enum.UserInputType.Touch
+		then
 
-			if
-				input.UserInputType
-					~= Enum.UserInputType.MouseMovement
+			return
 
-				and input.UserInputType
-					~= Enum.UserInputType.Touch
-			then
+		end
 
-				return
+		local delta =
+			input.Position
+			- dragStart
 
-			end
+		panel.Position =
+			UDim2.new(
 
+				startPos.X.Scale,
 
-			local delta =
-				input.Position
-				- dragStart
+				startPos.X.Offset
+					+ delta.X,
 
+				startPos.Y.Scale,
 
-			panel.Position =
-				UDim2.new(
+				startPos.Y.Offset
+					+ delta.Y
 
-					panelStart.X.Scale,
+			)
 
-					panelStart.X.Offset
-						+ delta.X,
-
-					panelStart.Y.Scale,
-
-					panelStart.Y.Offset
-						+ delta.Y
-
-				)
-
-		end)
+	end)
 
 end
-
 
 --========================================================
 -- CHARACTER
 --========================================================
 
-local RootAttachment =
-	nil
-
+local RootAttachment
 
 local function getRoot()
 
-	local char =
-		LP.Character
-
+	local char = LP.Character
 
 	if not char then
 		return nil
 	end
 
-
-	return
-		char:
-			FindFirstChild(
-				"HumanoidRootPart"
-			)
+	return char:FindFirstChild(
+		"HumanoidRootPart"
+	)
 
 end
 
-
 local function getRootAttachment()
 
-	local root =
-		getRoot()
-
+	local root = getRoot()
 
 	if not root then
 		return nil
 	end
 
-
 	if
 		RootAttachment
-
-		and RootAttachment.Parent
-			== root
+		and RootAttachment.Parent == root
 	then
 
-		return
-			RootAttachment
+		return RootAttachment
 
 	end
 
-
 	RootAttachment =
-		root:
-			FindFirstChild(
-				"FTX_ROOT"
-			)
-
+		root:FindFirstChild(
+			"FTX_ROOT"
+		)
 
 	if not RootAttachment then
 
@@ -1107,36 +462,56 @@ local function getRootAttachment()
 				"Attachment"
 			)
 
-
 		RootAttachment.Name =
 			"FTX_ROOT"
-
 
 		RootAttachment.Parent =
 			root
 
 	end
 
-
 	return RootAttachment
 
 end
 
+--========================================================
+-- GOOD SOUND
+--========================================================
+
+local GoodSound = Instance.new("Sound")
+
+GoodSound.Name = "FTX_20M_SOUND"
+GoodSound.SoundId = GOOD_SOUND_ID
+GoodSound.Volume = 2
+GoodSound.Parent = SoundService
+
+local lastSound = 0
+
+local function playGoodSound()
+
+	if os.clock() - lastSound < 0.3 then
+		return
+	end
+
+	lastSound = os.clock()
+
+	pcall(function()
+
+		GoodSound.TimePosition = 0
+		GoodSound:Play()
+
+	end)
+
+end
 
 --========================================================
 -- HOP BUTTON
 --========================================================
 
-local HopHolder =
-	Instance.new(
-		"Frame"
-	)
+local HopHolder = Instance.new("Frame")
 
 HopHolder.AnchorPoint =
-	Vector2.new(
-		1,
-		1
-	)
+	Vector2.new(1, 1)
 
 HopHolder.Position =
 	UDim2.new(
@@ -1156,23 +531,18 @@ HopHolder.Size =
 
 HopHolder.BackgroundColor3 =
 	Color3.fromRGB(
-		13,
-		13,
-		17
+		12,
+		12,
+		16
 	)
 
-HopHolder.BorderSizePixel =
-	0
-
-HopHolder.Parent =
-	Gui
-
+HopHolder.BorderSizePixel = 0
+HopHolder.Parent = Gui
 
 corner(
 	HopHolder,
 	15
 )
-
 
 local HopStroke =
 	stroke(
@@ -1180,55 +550,38 @@ local HopStroke =
 		2
 	)
 
-
 local HopButton =
-	Instance.new(
-		"TextButton"
-	)
+	Instance.new("TextButton")
 
 HopButton.Size =
-	UDim2.fromScale(
-		1,
-		1
-	)
+	UDim2.fromScale(1, 1)
 
-HopButton.BackgroundTransparency =
-	1
+HopButton.BackgroundTransparency = 1
 
-HopButton.AutoButtonColor =
-	false
-
-HopButton.Text =
-	"HOP"
+HopButton.Text = "HOP"
 
 HopButton.TextColor3 =
 	Color3.fromRGB(
 		255,
-		225,
-		70
+		220,
+		60
 	)
 
 HopButton.Font =
 	Enum.Font.GothamBlack
 
-HopButton.TextSize =
-	24
+HopButton.TextSize = 24
 
-HopButton.Parent =
-	HopHolder
-
+HopButton.Parent = HopHolder
 
 local HopGradient =
-	Instance.new(
-		"UIGradient"
-	)
+	Instance.new("UIGradient")
 
 HopGradient.Color =
 	ColorSequence.new({
 
 		ColorSequenceKeypoint.new(
 			0,
-
 			Color3.fromRGB(
 				255,
 				90,
@@ -1238,17 +591,15 @@ HopGradient.Color =
 
 		ColorSequenceKeypoint.new(
 			0.5,
-
 			Color3.fromRGB(
 				255,
-				240,
-				50
+				235,
+				40
 			)
 		),
 
 		ColorSequenceKeypoint.new(
 			1,
-
 			Color3.fromRGB(
 				255,
 				120,
@@ -1261,58 +612,45 @@ HopGradient.Color =
 HopGradient.Parent =
 	HopStroke
 
-
 task.spawn(function()
 
 	while Gui.Parent do
 
-		local tween =
-			TweenService:
-				Create(
+		local t =
+			TweenService:Create(
 
-					HopGradient,
+				HopGradient,
 
-					TweenInfo.new(
-						2,
-						Enum.EasingStyle.Linear
-					),
+				TweenInfo.new(
+					2,
+					Enum.EasingStyle.Linear
+				),
 
-					{
-						Rotation =
-							HopGradient.Rotation
-							+ 360
-					}
+				{
+					Rotation =
+						HopGradient.Rotation + 360
+				}
 
-				)
+			)
 
-
-		tween:Play()
-
-		tween.Completed:
-			Wait()
+		t:Play()
+		t.Completed:Wait()
 
 	end
 
 end)
 
-
 --========================================================
 -- MAIN MENU
 --========================================================
 
-local MainMenu =
-	Instance.new(
-		"Frame"
-	)
+local MainMenu = Instance.new("Frame")
 
 MainMenu.AnchorPoint =
-	Vector2.new(
-		0,
-		0.5
-	)
+	Vector2.new(0, 0.5)
 
 MainMenu.Position =
-	tableToPosition(
+	loadPos(
 
 		Saved.MainMenuPosition,
 
@@ -1320,7 +658,7 @@ MainMenu.Position =
 			0,
 			20,
 			0.5,
-			-140
+			-150
 		)
 
 	)
@@ -1335,46 +673,35 @@ MainMenu.Size =
 
 MainMenu.BackgroundColor3 =
 	Color3.fromRGB(
-		11,
-		11,
-		15
+		10,
+		10,
+		14
 	)
 
-MainMenu.BackgroundTransparency =
-	0.04
-
-MainMenu.BorderSizePixel =
-	0
+MainMenu.BorderSizePixel = 0
 
 MainMenu.Visible =
-	Saved.MainMenuOpen
-	~= false
+	Saved.MainMenuOpen ~= false
 
-MainMenu.Parent =
-	Gui
-
+MainMenu.Parent = Gui
 
 corner(
 	MainMenu,
 	17
 )
 
-
 stroke(
 	MainMenu,
 	2,
 	Color3.fromRGB(
 		255,
-		175,
-		30
+		170,
+		25
 	)
 )
 
-
 local MainHeader =
-	Instance.new(
-		"TextButton"
-	)
+	Instance.new("TextButton")
 
 MainHeader.Size =
 	UDim2.new(
@@ -1384,11 +711,7 @@ MainHeader.Size =
 		48
 	)
 
-MainHeader.BackgroundTransparency =
-	1
-
-MainHeader.AutoButtonColor =
-	false
+MainHeader.BackgroundTransparency = 1
 
 MainHeader.Text =
 	"FTX CONTROLS"
@@ -1397,47 +720,21 @@ MainHeader.TextColor3 =
 	Color3.fromRGB(
 		255,
 		220,
-		70
+		60
 	)
 
 MainHeader.Font =
 	Enum.Font.GothamBlack
 
-MainHeader.TextSize =
-	17
+MainHeader.TextSize = 17
 
-MainHeader.TextXAlignment =
-	Enum.TextXAlignment.Left
-
-MainHeader.Parent =
-	MainMenu
-
-
-local HeaderPadding =
-	Instance.new(
-		"UIPadding"
-	)
-
-HeaderPadding.PaddingLeft =
-	UDim.new(
-		0,
-		14
-	)
-
-HeaderPadding.Parent =
-	MainHeader
-
+MainHeader.Parent = MainMenu
 
 local MainClose =
-	Instance.new(
-		"TextButton"
-	)
+	Instance.new("TextButton")
 
 MainClose.AnchorPoint =
-	Vector2.new(
-		1,
-		0
-	)
+	Vector2.new(1, 0)
 
 MainClose.Position =
 	UDim2.new(
@@ -1459,48 +756,34 @@ MainClose.BackgroundColor3 =
 	Color3.fromRGB(
 		30,
 		30,
-		35
+		36
 	)
 
-MainClose.BorderSizePixel =
-	0
+MainClose.BorderSizePixel = 0
 
-MainClose.Text =
-	"×"
+MainClose.Text = "×"
 
 MainClose.TextColor3 =
-	Color3.new(
-		1,
-		1,
-		1
-	)
+	Color3.new(1, 1, 1)
 
 MainClose.Font =
 	Enum.Font.GothamBlack
 
-MainClose.TextSize =
-	23
+MainClose.TextSize = 22
 
 MainClose.Parent =
 	MainMenu
 
-
 corner(
 	MainClose,
-	10
+	9
 )
 
-
 local MainOpen =
-	Instance.new(
-		"TextButton"
-	)
+	Instance.new("TextButton")
 
 MainOpen.AnchorPoint =
-	Vector2.new(
-		0,
-		0.5
-	)
+	Vector2.new(0, 0.5)
 
 MainOpen.Position =
 	UDim2.new(
@@ -1525,11 +808,9 @@ MainOpen.BackgroundColor3 =
 		20
 	)
 
-MainOpen.BorderSizePixel =
-	0
+MainOpen.BorderSizePixel = 0
 
-MainOpen.Text =
-	"FTX"
+MainOpen.Text = "FTX"
 
 MainOpen.TextColor3 =
 	Color3.fromRGB(
@@ -1541,21 +822,17 @@ MainOpen.TextColor3 =
 MainOpen.Font =
 	Enum.Font.GothamBlack
 
-MainOpen.TextSize =
-	15
+MainOpen.TextSize = 14
 
 MainOpen.Visible =
 	not MainMenu.Visible
 
-MainOpen.Parent =
-	Gui
-
+MainOpen.Parent = Gui
 
 corner(
 	MainOpen,
-	15
+	14
 )
-
 
 stroke(
 	MainOpen,
@@ -1567,70 +844,46 @@ stroke(
 	)
 )
 
-
 makeDraggable(
 	MainMenu,
 	MainHeader,
 	"MainMenuPosition"
 )
 
+MainClose.MouseButton1Click:Connect(function()
 
-MainClose.MouseButton1Click:
-	Connect(function()
+	MainMenu.Visible = false
+	MainOpen.Visible = true
 
-		MainMenu.Visible =
-			false
+	Saved.MainMenuOpen = false
+	Saved.MainMenuPosition =
+		savePos(MainMenu.Position)
 
+	saveSettings()
 
-		MainOpen.Visible =
-			true
+end)
 
+MainOpen.MouseButton1Click:Connect(function()
 
-		Saved.MainMenuOpen =
-			false
+	MainMenu.Visible = true
+	MainOpen.Visible = false
 
+	Saved.MainMenuOpen = true
 
-		Saved.MainMenuPosition =
-			positionToTable(
-				MainMenu.Position
-			)
+	saveSettings()
 
-
-		saveSettings()
-
-	end)
-
-
-MainOpen.MouseButton1Click:
-	Connect(function()
-
-		MainMenu.Visible =
-			true
-
-
-		MainOpen.Visible =
-			false
-
-
-		Saved.MainMenuOpen =
-			true
-
-
-		saveSettings()
-
-	end)
-
+end)
 
 --========================================================
--- CONTROL LIST
+-- CONTROL BUTTONS
 --========================================================
 
-local ControlsList =
+local Controls =
 	Instance.new(
 		"ScrollingFrame"
 	)
 
-ControlsList.Position =
+Controls.Position =
 	UDim2.new(
 		0,
 		10,
@@ -1638,7 +891,7 @@ ControlsList.Position =
 		52
 	)
 
-ControlsList.Size =
+Controls.Size =
 	UDim2.new(
 		1,
 		-20,
@@ -1646,50 +899,34 @@ ControlsList.Size =
 		-62
 	)
 
-ControlsList.BackgroundTransparency =
-	1
+Controls.BackgroundTransparency = 1
+Controls.BorderSizePixel = 0
 
-ControlsList.BorderSizePixel =
-	0
-
-ControlsList.ScrollBarThickness =
-	3
-
-ControlsList.AutomaticCanvasSize =
+Controls.AutomaticCanvasSize =
 	Enum.AutomaticSize.Y
 
-ControlsList.CanvasSize =
-	UDim2.new()
+Controls.CanvasSize = UDim2.new()
+Controls.ScrollBarThickness = 3
 
-ControlsList.Parent =
-	MainMenu
+Controls.Parent = MainMenu
 
+local ControlLayout =
+	Instance.new("UIListLayout")
 
-local ControlsLayout =
-	Instance.new(
-		"UIListLayout"
-	)
+ControlLayout.Padding =
+	UDim.new(0, 8)
 
-ControlsLayout.Padding =
-	UDim.new(
-		0,
-		8
-	)
+ControlLayout.Parent =
+	Controls
 
-ControlsLayout.Parent =
-	ControlsList
+local function makeControl(name)
 
-
-local function createMenuButton(
-	title
-)
-
-	local button =
+	local b =
 		Instance.new(
 			"TextButton"
 		)
 
-	button.Size =
+	b.Size =
 		UDim2.new(
 			1,
 			-4,
@@ -1697,171 +934,122 @@ local function createMenuButton(
 			46
 		)
 
-	button.BackgroundColor3 =
+	b.BackgroundColor3 =
 		Color3.fromRGB(
 			23,
 			23,
 			28
 		)
 
-	button.BackgroundTransparency =
-		0.04
+	b.BorderSizePixel = 0
 
-	button.BorderSizePixel =
-		0
-
-	button.AutoButtonColor =
-		false
-
-	button.Text =
-		title
-
-	button.Font =
+	b.Font =
 		Enum.Font.GothamBold
 
-	button.TextSize =
-		13
+	b.TextSize = 13
 
-	button.Parent =
-		ControlsList
+	b.Text = name
 
+	b.Parent = Controls
 
-	corner(
-		button,
-		11
-	)
-
+	corner(b, 10)
 
 	local s =
 		stroke(
-			button,
+			b,
 			1.5,
 			Color3.fromRGB(
 				70,
 				70,
-				76
+				78
 			)
 		)
 
-
-	return
-		button,
-		s
+	return b, s
 
 end
 
-
 local NearestButton,
 	NearestStroke =
-	createMenuButton(
+	makeControl(
 		"NEAREST STEAL"
 	)
 
-
 local HighestButton,
 	HighestStroke =
-	createMenuButton(
+	makeControl(
 		"HIGHEST MONEY"
 	)
 
-
 local AutoKickButton,
 	AutoKickStroke =
-	createMenuButton(
+	makeControl(
 		"AUTO KICK"
 	)
 
-
 local AutoHopButton,
 	AutoHopStroke =
-	createMenuButton(
+	makeControl(
 		"AUTO HOP"
 	)
 
-
 local RadarCircleButton,
 	RadarCircleStroke =
-	createMenuButton(
+	makeControl(
 		"RADAR CIRCLE"
 	)
 
-
 local PlayerHighlightButton,
 	PlayerHighlightStroke =
-	createMenuButton(
+	makeControl(
 		"PLAYER HIGHLIGHT"
 	)
 
-
 local RadarMenuButton,
 	RadarMenuStroke =
-	createMenuButton(
+	makeControl(
 		"RADAR MENU"
 	)
 
-
 local BrainrotMenuButton,
 	BrainrotMenuStroke =
-	createMenuButton(
+	makeControl(
 		"BRAINROT MENU"
 	)
-
 
 --========================================================
 -- STATES
 --========================================================
 
 local nearestEnabled =
-	Saved.NearestSteal
-	== true
-
+	Saved.NearestSteal == true
 
 local highestEnabled =
-	Saved.HighestMoney
-	== true
-
+	Saved.HighestMoney == true
 
 if
 	nearestEnabled
 	and highestEnabled
 then
 
-	highestEnabled =
-		false
-
-	Saved.HighestMoney =
-		false
+	highestEnabled = false
 
 end
 
-
 local autoKickEnabled =
-	Saved.AutoKick
-	~= false
-
+	Saved.AutoKick ~= false
 
 local autoHopEnabled =
-	Saved.AutoHop
-	== true
-
+	Saved.AutoHop == true
 
 local radarCircleEnabled =
-	Saved.RadarCircle
-	~= false
-
+	Saved.RadarCircle ~= false
 
 local playerHighlightEnabled =
-	Saved.PlayerHighlight
-	~= false
+	Saved.PlayerHighlight ~= false
 
-
-local autoHopManuallyRestarted =
+local manualAutoHopRestart =
 	false
-
-
---========================================================
--- TOGGLE VISUALS
---========================================================
 
 local function updateToggle(
 	button,
@@ -1874,159 +1062,117 @@ local function updateToggle(
 
 		button.Text =
 			title
-			.. "   •   ON"
-
+			.. "  •  ON"
 
 		button.TextColor3 =
 			Color3.fromRGB(
 				255,
-				222,
-				65
+				220,
+				60
 			)
-
 
 		outline.Color =
 			Color3.fromRGB(
 				255,
-				174,
-				28
+				170,
+				25
 			)
 
-
-		outline.Thickness =
-			2
+		outline.Thickness = 2
 
 	else
 
 		button.Text =
 			title
-			.. "   •   OFF"
-
+			.. "  •  OFF"
 
 		button.TextColor3 =
 			Color3.fromRGB(
-				165,
-				165,
-				172
+				160,
+				160,
+				170
 			)
-
 
 		outline.Color =
 			Color3.fromRGB(
-				67,
-				67,
-				73
+				65,
+				65,
+				72
 			)
 
-
-		outline.Thickness =
-			1.5
+		outline.Thickness = 1.5
 
 	end
 
 end
-
 
 --========================================================
 -- MONEY PARSER
 --========================================================
 
-local function parseMoney(
-	text
-)
+local function parseMoney(text)
 
 	if typeof(text) ~= "string" then
 		return nil
 	end
 
-
 	local clean =
 		text:
-			upper():
-			gsub(",", ""):
-			gsub("^%s+", ""):
-			gsub("%s+$", "")
-
+		upper():
+		gsub(",", ""):
+		gsub("^%s+", ""):
+		gsub("%s+$", "")
 
 	local number,
 		suffix =
-		clean:
-			match(
-				"^%$([%d%.]+)([KMBTQ]?)%s*/%s*S$"
-			)
-
-
-	if not number then
-
-		number,
-			suffix =
-			clean:
-				match(
-					"^%$([%d%.]+)([KMBTQ]?)%s*/%s*SEC$"
-				)
-
-	end
-
-
-	if not number then
-
-		number,
-			suffix =
-			clean:
-				match(
-					"^%$([%d%.]+)([KMBTQ]?)%s*PER%s*SEC$"
-				)
-
-	end
-
-
-	number =
-		tonumber(
-			number
+		clean:match(
+			"^%$([%d%.]+)([KMBTQ]?)%s*/%s*S$"
 		)
 
+	if not number then
+
+		number,
+			suffix =
+			clean:match(
+				"^%$([%d%.]+)([KMBTQ]?)%s*/%s*SEC$"
+			)
+
+	end
 
 	if not number then
 		return nil
 	end
 
+	number = tonumber(number)
 
-	local mult =
-		1
-
-
-	if suffix == "K" then
-		mult = 1e3
-
-	elseif suffix == "M" then
-		mult = 1e6
-
-	elseif suffix == "B" then
-		mult = 1e9
-
-	elseif suffix == "T" then
-		mult = 1e12
-
-	elseif suffix == "Q" then
-		mult = 1e15
+	if not number then
+		return nil
 	end
 
+	local multiplier = 1
 
-	return
-		number
-		* mult
+	if suffix == "K" then
+		multiplier = 1e3
+
+	elseif suffix == "M" then
+		multiplier = 1e6
+
+	elseif suffix == "B" then
+		multiplier = 1e9
+
+	elseif suffix == "T" then
+		multiplier = 1e12
+
+	elseif suffix == "Q" then
+		multiplier = 1e15
+
+	end
+
+	return number * multiplier
 
 end
 
-
-local function formatMoney(
-	value
-)
-
-	if not value then
-		return "$0/s"
-	end
-
+local function formatMoney(value)
 
 	if value >= 1e15 then
 
@@ -2058,80 +1204,49 @@ local function formatMoney(
 
 	end
 
-
-	return
-		"$"
+	return "$"
 		.. tostring(
-			math.floor(
-				value
-			)
+			math.floor(value)
 		)
 		.. "/s"
 
 end
 
-
 --========================================================
--- WORLD PART
+-- FIND WORLD PART
 --========================================================
 
-local function getWorldPart(
-	object
-)
+local function getWorldPart(obj)
 
-	local current =
-		object
+	local current = obj
 
-
-	for _ = 1, 24 do
+	for _ = 1, 20 do
 
 		if not current then
 			break
 		end
 
-
 		if
-			current:IsA(
-				"BillboardGui"
-			)
-
-			or current:IsA(
-				"SurfaceGui"
-			)
+			current:IsA("BillboardGui")
+			or current:IsA("SurfaceGui")
 		then
 
-			local adornee =
+			local a =
 				current.Adornee
 
+			if a then
 
-			if adornee then
-
-				if
-					adornee:IsA(
-						"BasePart"
-					)
-				then
-
-					return adornee
-
+				if a:IsA("BasePart") then
+					return a
 				end
 
-
 				if
-					adornee:IsA(
-						"Attachment"
-					)
-
-					and adornee.Parent
-
-					and adornee.Parent:
-						IsA(
-							"BasePart"
-						)
+					a:IsA("Attachment")
+					and a.Parent
+					and a.Parent:IsA("BasePart")
 				then
 
-					return
-						adornee.Parent
+					return a.Parent
 
 				end
 
@@ -2139,23 +1254,14 @@ local function getWorldPart(
 
 		end
 
-
-		if current:IsA(
-			"BasePart"
-		) then
-
+		if current:IsA("BasePart") then
 			return current
-
 		end
 
-
-		if current:IsA(
-			"Model"
-		) then
+		if current:IsA("Model") then
 
 			return
 				current.PrimaryPart
-
 				or current:
 					FindFirstChildWhichIsA(
 						"BasePart",
@@ -2164,101 +1270,35 @@ local function getWorldPart(
 
 		end
 
-
-		current =
-			current.Parent
+		current = current.Parent
 
 	end
-
 
 	return nil
 
 end
 
-
 --========================================================
 -- BRAINROT NAME
 --========================================================
 
-local blockedWords = {
+local blockedNames = {
 
-	"SECRET",
-	"GOLD",
-	"RADIOACTIVE",
-	"CANDY",
-	"DIAMOND",
-	"CYBER",
-	"STOLEN",
-	"COLLECT",
-	"COMMON",
-	"RARE",
-	"EPIC",
-	"LEGENDARY",
-	"MYTHIC",
-	"STEAL",
-	"OFFLINE CASH"
+	["SECRET"] = true,
+	["GOLD"] = true,
+	["DIAMOND"] = true,
+	["RADIOACTIVE"] = true,
+	["STOLEN"] = true,
+	["STEAL"] = true,
+	["COMMON"] = true,
+	["RARE"] = true,
+	["EPIC"] = true,
+	["LEGENDARY"] = true,
+	["MYTHIC"] = true
 
 }
 
-
-local function badBrainrotName(
-	text
-)
-
-	if
-		not text
-		or text == ""
-	then
-
-		return true
-
-	end
-
-
-	if parseMoney(
-		text
-	) then
-
-		return true
-
-	end
-
-
-	local upper =
-		text:
-			upper()
-
-
-	for _, word in ipairs(
-		blockedWords
-	) do
-
-		if
-			upper == word
-
-			or upper:
-				find(
-					word,
-					1,
-					true
-				)
-		then
-
-			return true
-
-		end
-
-	end
-
-
-	return false
-
-end
-
-
-local function findBrainrotName(
-	label
-)
+local function findBrainrotName(label)
 
 	local gui =
 		label:
@@ -2271,94 +1311,39 @@ local function findBrainrotName(
 				"SurfaceGui"
 			)
 
-		or label.Parent
-
-
 	if not gui then
 		return "UNKNOWN"
 	end
 
+	local best
 
-	local best =
-		nil
-
-
-	local bestScore =
-		-math.huge
-
-
-	for _, object in ipairs(
-		gui:
-			GetDescendants()
+	for _, obj in ipairs(
+		gui:GetDescendants()
 	) do
 
 		if
-			object ~= label
-
+			obj ~= label
 			and (
-				object:IsA(
-					"TextLabel"
-				)
-
-				or object:IsA(
-					"TextButton"
-				)
+				obj:IsA("TextLabel")
+				or obj:IsA("TextButton")
 			)
 		then
 
 			local text =
-				tostring(
-					object.Text
-					or ""
-				)
+				tostring(obj.Text or "")
 
+			local upper =
+				text:upper()
 
 			if
 				#text >= 2
-
-				and #text <= 70
-
-				and not badBrainrotName(
-					text
-				)
+				and #text <= 60
+				and not parseMoney(text)
+				and not blockedNames[upper]
 			then
 
-				local score =
-					0
-
-
-				if
-					object.Parent
-					== label.Parent
-				then
-
-					score +=
-						1000
-
-				end
-
-
-				if
-					object.AbsolutePosition.Y
-					< label.AbsolutePosition.Y
-				then
-
-					score +=
-						500
-
-				end
-
-
-				if score > bestScore then
-
-					bestScore =
-						score
-
-
-					best =
-						text
-
-				end
+				best = text
+				break
 
 			end
 
@@ -2366,215 +1351,46 @@ local function findBrainrotName(
 
 	end
 
-
-	return
-		best
-		or "UNKNOWN"
+	return best or "UNKNOWN"
 
 end
 
-
 --========================================================
--- MONEY STORAGE
+-- MONEY TARGETS
 --========================================================
 
-local MoneyTargets =
-	{}
-
-
-local WatchedMoney =
-	{}
-
-
-local BrainrotESP =
-	{}
-
-
-local AnnouncedGoodTargets =
-	setmetatable(
-		{},
-		{
-			__mode = "k"
-		}
-	)
-
+local MoneyTargets = {}
+local WatchedMoney = {}
+local BrainrotESP = {}
+local announced = {}
 
 local function hasGoodBrainrot()
 
-	for label,
-		data in pairs(
-			MoneyTargets
-		)
-	do
+	for label, data in pairs(
+		MoneyTargets
+	) do
 
 		if
-			label
-			and label.Parent
-
-			and data
-			and data.Value
-
-			and data.Value
-				>= MIN_MONEY
-
+			label.Parent
+			and data.Value >= MIN_MONEY
 			and data.Part
-
 			and data.Part.Parent
 		then
 
-			return
-				true,
-				data,
-				label
+			return true, data
 
 		end
 
 	end
 
-
-	return
-		false,
-		nil,
-		nil
+	return false
 
 end
 
-
---========================================================
--- SELECTED BRAINROT
---========================================================
-
-local SelectedLabel =
-	nil
-
-
-local SelectedBeam =
-	nil
-
-
-local SelectedAttachment =
-	nil
-
-
-local function clearSelected()
-
-	SelectedLabel =
-		nil
-
-
-	if SelectedBeam then
-
-		SelectedBeam:
-			Destroy()
-
-		SelectedBeam =
-			nil
-
-	end
-
-
-	if SelectedAttachment then
-
-		SelectedAttachment:
-			Destroy()
-
-		SelectedAttachment =
-			nil
-
-	end
-
-end
-
-
-local function selectBrainrot(
-	label,
-	data
-)
-
-	if SelectedLabel == label then
-
-		clearSelected()
-
-		return
-
-	end
-
-
-	clearSelected()
-
-
-	if
-		not data
-		or not data.Part
-		or not data.Part.Parent
-	then
-
-		return
-
-	end
-
-
-	SelectedLabel =
-		label
-
-
-	SelectedAttachment =
-		Instance.new(
-			"Attachment"
-		)
-
-	SelectedAttachment.Parent =
-		data.Part
-
-
-	SelectedBeam =
-		Instance.new(
-			"Beam"
-		)
-
-	SelectedBeam.Attachment0 =
-		getRootAttachment()
-
-	SelectedBeam.Attachment1 =
-		SelectedAttachment
-
-	SelectedBeam.FaceCamera =
-		true
-
-	SelectedBeam.Width0 =
-		0.3
-
-	SelectedBeam.Width1 =
-		0.3
-
-	SelectedBeam.Color =
-		ColorSequence.new(
-			Color3.fromRGB(
-				255,
-				205,
-				30
-			)
-		)
-
-	SelectedBeam.Parent =
-		WorldFolder
-
-end
-
-
---========================================================
--- BRAINROT ESP
---========================================================
-
-local function removeBrainrotESP(
-	label
-)
+local function removeESP(label)
 
 	local data =
-		BrainrotESP[
-			label
-		]
-
+		BrainrotESP[label]
 
 	if data then
 
@@ -2582,11 +1398,9 @@ local function removeBrainrotESP(
 			data.Gui:Destroy()
 		end
 
-
 		if data.Beam then
 			data.Beam:Destroy()
 		end
-
 
 		if data.Attachment then
 			data.Attachment:Destroy()
@@ -2594,28 +1408,15 @@ local function removeBrainrotESP(
 
 	end
 
-
-	BrainrotESP[
-		label
-	] =
-		nil
+	BrainrotESP[label] = nil
 
 end
 
+local function createESP(label, data)
 
-local function createBrainrotESP(
-	label,
-	data
-)
-
-	if BrainrotESP[
-		label
-	] then
-
+	if BrainrotESP[label] then
 		return
-
 	end
-
 
 	local billboard =
 		Instance.new(
@@ -2625,21 +1426,17 @@ local function createBrainrotESP(
 	billboard.Adornee =
 		data.Part
 
-	billboard.AlwaysOnTop =
-		true
+	billboard.AlwaysOnTop = true
+	billboard.LightInfluence = 0
 
-	billboard.LightInfluence =
-		0
-
-	billboard.MaxDistance =
-		100000
+	billboard.MaxDistance = 100000
 
 	billboard.Size =
 		UDim2.new(
 			0,
 			390,
 			0,
-			120
+			115
 		)
 
 	billboard.StudsOffset =
@@ -2652,43 +1449,39 @@ local function createBrainrotESP(
 	billboard.Parent =
 		ESPFolder
 
-
 	local text =
 		Instance.new(
 			"TextLabel"
 		)
 
 	text.Size =
-		UDim2.fromScale(
-			1,
-			1
-		)
+		UDim2.fromScale(1, 1)
 
-	text.BackgroundTransparency =
-		1
+	text.BackgroundTransparency = 1
 
 	text.TextColor3 =
 		Color3.fromRGB(
-			65,
+			55,
 			255,
-			95
+			90
 		)
 
-	text.TextTransparency =
-		0.65
-
-	text.TextStrokeTransparency =
-		0.65
+	-- 65% transparent
+	text.TextTransparency = 0.65
+	text.TextStrokeTransparency = 0.65
 
 	text.Font =
 		Enum.Font.GothamBlack
 
-	text.TextScaled =
-		true
+	text.TextScaled = true
+
+	text.Text =
+		(data.Name or "UNKNOWN")
+		.. "\n"
+		.. data.Text
 
 	text.Parent =
 		billboard
-
 
 	local attachment =
 		Instance.new(
@@ -2697,7 +1490,6 @@ local function createBrainrotESP(
 
 	attachment.Parent =
 		data.Part
-
 
 	local beam =
 		Instance.new(
@@ -2710,14 +1502,10 @@ local function createBrainrotESP(
 	beam.Attachment1 =
 		attachment
 
-	beam.FaceCamera =
-		true
+	beam.FaceCamera = true
 
-	beam.Width0 =
-		0.13
-
-	beam.Width1 =
-		0.13
+	beam.Width0 = 0.14
+	beam.Width1 = 0.14
 
 	beam.Color =
 		ColorSequence.new(
@@ -2731,291 +1519,144 @@ local function createBrainrotESP(
 	beam.Parent =
 		WorldFolder
 
+	BrainrotESP[label] = {
 
-	local function update()
-
-		if not label.Parent then
-			return
-		end
-
-
-		text.Text =
-			findBrainrotName(
-				label
-			)
-			.. "\n"
-			.. tostring(
-				label.Text
-			)
-
-	end
-
-
-	BrainrotESP[
-		label
-	] = {
-
-		Gui =
-			billboard,
-
-		Text =
-			text,
-
-		Beam =
-			beam,
-
-		Attachment =
-			attachment,
-
-		Update =
-			update
+		Gui = billboard,
+		Label = text,
+		Attachment = attachment,
+		Beam = beam
 
 	}
 
-
-	update()
-
 end
 
-
-local function checkMoney(
-	object
-)
+local function checkMoney(obj)
 
 	if
-		not object
-		or not object.Parent
+		not obj
+		or not obj.Parent
 	then
 
 		return
 
 	end
 
-
-	local oldData =
-		MoneyTargets[
-			object
-		]
-
-
-	local wasGood =
-		oldData
-
-		and oldData.Value
-
-		and oldData.Value
-			>= MIN_MONEY
-
-
 	local value =
-		parseMoney(
-			object.Text
-		)
-
+		parseMoney(obj.Text)
 
 	if not value then
 
-		MoneyTargets[
-			object
-		] =
-			nil
+		MoneyTargets[obj] = nil
+		announced[obj] = nil
 
-
-		AnnouncedGoodTargets[
-			object
-		] =
-			nil
-
-
-		removeBrainrotESP(
-			object
-		)
-
+		removeESP(obj)
 
 		return
 
 	end
 
-
 	local part =
-		getWorldPart(
-			object
-		)
-
+		getWorldPart(obj)
 
 	if not part then
 		return
 	end
 
-
 	local data = {
 
-		Value =
-			value,
-
-		Part =
-			part,
+		Value = value,
+		Part = part,
 
 		Name =
-			findBrainrotName(
-				object
-			),
+			findBrainrotName(obj),
 
 		Text =
-			tostring(
-				object.Text
-			)
+			tostring(obj.Text)
 
 	}
 
-
-	MoneyTargets[
-		object
-	] =
-		data
-
+	MoneyTargets[obj] = data
 
 	if value >= MIN_MONEY then
 
-		if
-			not wasGood
+		if not announced[obj] then
 
-			and not AnnouncedGoodTargets[
-				object
-			]
-		then
-
-			AnnouncedGoodTargets[
-				object
-			] =
-				true
-
-
+			announced[obj] = true
 			playGoodSound()
 
 		end
 
+		if not BrainrotESP[obj] then
 
-		if not BrainrotESP[
-			object
-		] then
-
-			createBrainrotESP(
-				object,
+			createESP(
+				obj,
 				data
 			)
 
 		else
 
-			BrainrotESP[
-				object
-			].Update()
+			BrainrotESP[obj].Label.Text =
+				data.Name
+				.. "\n"
+				.. data.Text
 
 		end
 
 	else
 
-		AnnouncedGoodTargets[
-			object
-		] =
-			nil
-
-
-		removeBrainrotESP(
-			object
-		)
+		announced[obj] = nil
+		removeESP(obj)
 
 	end
 
 end
 
+local function watchMoney(obj)
 
-local function watchMoney(
-	object
-)
-
-	if WatchedMoney[
-		object
-	] then
-
+	if WatchedMoney[obj] then
 		return
-
 	end
 
-
 	if
-		not object:IsA(
-			"TextLabel"
-		)
-
-		and not object:IsA(
-			"TextButton"
-		)
+		not obj:IsA("TextLabel")
+		and not obj:IsA("TextButton")
 	then
 
 		return
 
 	end
 
+	WatchedMoney[obj] = true
 
-	WatchedMoney[
-		object
-	] =
-		true
+	checkMoney(obj)
 
-
-	checkMoney(
-		object
-	)
-
-
-	object:
-		GetPropertyChangedSignal(
-			"Text"
-		):
+	obj:
+		GetPropertyChangedSignal("Text"):
 		Connect(function()
 
-			checkMoney(
-				object
-			)
+			checkMoney(obj)
 
 		end)
 
 end
 
-
 local function scanMoney()
 
-	for index,
-		object in ipairs(
-			workspace:
-				GetDescendants()
-		)
-	do
+	for index, obj in ipairs(
+		workspace:GetDescendants()
+	) do
 
 		if
-			object:IsA(
-				"TextLabel"
-			)
-
-			or object:IsA(
-				"TextButton"
-			)
+			obj:IsA("TextLabel")
+			or obj:IsA("TextButton")
 		then
 
-			watchMoney(
-				object
-			)
-
-
-			checkMoney(
-				object
-			)
+			watchMoney(obj)
+			checkMoney(obj)
 
 		end
 
-
-		if index % 500 == 0 then
+		if index % 600 == 0 then
 			task.wait()
 		end
 
@@ -3023,27 +1664,18 @@ local function scanMoney()
 
 end
 
-
--- Run immediately instead of waiting for timer.
-task.spawn(
-	scanMoney
-)
-
+task.spawn(scanMoney)
 
 workspace.DescendantAdded:
-	Connect(
-		watchMoney
-	)
-
+	Connect(watchMoney)
 
 task.spawn(function()
 
 	while Gui.Parent do
 
 		task.wait(
-			MONEY_RESCAN_RATE
+			MONEY_SCAN_INTERVAL
 		)
-
 
 		scanMoney()
 
@@ -3051,24 +1683,18 @@ task.spawn(function()
 
 end)
 
-
 --========================================================
--- BRAINROT MENU
+-- BRAINROT PANEL
 --========================================================
 
 local BrainrotPanel =
-	Instance.new(
-		"Frame"
-	)
+	Instance.new("Frame")
 
 BrainrotPanel.AnchorPoint =
-	Vector2.new(
-		1,
-		0.5
-	)
+	Vector2.new(1, 0.5)
 
 BrainrotPanel.Position =
-	tableToPosition(
+	loadPos(
 
 		Saved.BrainrotMenuPosition,
 
@@ -3093,28 +1719,21 @@ BrainrotPanel.BackgroundColor3 =
 	Color3.fromRGB(
 		12,
 		12,
-		15
+		16
 	)
 
-BrainrotPanel.BackgroundTransparency =
-	0.08
-
-BrainrotPanel.BorderSizePixel =
-	0
+BrainrotPanel.BorderSizePixel = 0
 
 BrainrotPanel.Visible =
-	Saved.BrainrotMenuOpen
-	~= false
+	Saved.BrainrotMenuOpen ~= false
 
 BrainrotPanel.Parent =
 	Gui
-
 
 corner(
 	BrainrotPanel,
 	16
 )
-
 
 stroke(
 	BrainrotPanel,
@@ -3122,15 +1741,12 @@ stroke(
 	Color3.fromRGB(
 		255,
 		180,
-		35
+		30
 	)
 )
 
-
 local BrainrotTitle =
-	Instance.new(
-		"TextButton"
-	)
+	Instance.new("TextButton")
 
 BrainrotTitle.Size =
 	UDim2.new(
@@ -3140,11 +1756,7 @@ BrainrotTitle.Size =
 		42
 	)
 
-BrainrotTitle.BackgroundTransparency =
-	1
-
-BrainrotTitle.AutoButtonColor =
-	false
+BrainrotTitle.BackgroundTransparency = 1
 
 BrainrotTitle.Text =
 	"BRAINROTS $20M+"
@@ -3153,29 +1765,22 @@ BrainrotTitle.TextColor3 =
 	Color3.fromRGB(
 		255,
 		220,
-		70
+		60
 	)
 
 BrainrotTitle.Font =
 	Enum.Font.GothamBlack
 
-BrainrotTitle.TextSize =
-	16
+BrainrotTitle.TextSize = 15
 
 BrainrotTitle.Parent =
 	BrainrotPanel
 
-
 local BrainrotClose =
-	Instance.new(
-		"TextButton"
-	)
+	Instance.new("TextButton")
 
 BrainrotClose.AnchorPoint =
-	Vector2.new(
-		1,
-		0
-	)
+	Vector2.new(1, 0)
 
 BrainrotClose.Position =
 	UDim2.new(
@@ -3200,39 +1805,28 @@ BrainrotClose.BackgroundColor3 =
 		35
 	)
 
-BrainrotClose.BorderSizePixel =
-	0
-
-BrainrotClose.Text =
-	"×"
-
+BrainrotClose.Text = "×"
 BrainrotClose.TextColor3 =
-	Color3.new(
-		1,
-		1,
-		1
-	)
+	Color3.new(1, 1, 1)
 
 BrainrotClose.Font =
 	Enum.Font.GothamBlack
 
-BrainrotClose.TextSize =
-	21
+BrainrotClose.TextSize = 20
+BrainrotClose.BorderSizePixel = 0
 
 BrainrotClose.Parent =
 	BrainrotPanel
 
-
 corner(
 	BrainrotClose,
-	9
+	8
 )
-
 
 local BrainrotList =
 	Instance.new(
 		"ScrollingFrame"
-	)
+		)
 
 BrainrotList.Position =
 	UDim2.new(
@@ -3250,14 +1844,8 @@ BrainrotList.Size =
 		-52
 	)
 
-BrainrotList.BackgroundTransparency =
-	1
-
-BrainrotList.BorderSizePixel =
-	0
-
-BrainrotList.ScrollBarThickness =
-	4
+BrainrotList.BackgroundTransparency = 1
+BrainrotList.BorderSizePixel = 0
 
 BrainrotList.AutomaticCanvasSize =
 	Enum.AutomaticSize.Y
@@ -3265,27 +1853,19 @@ BrainrotList.AutomaticCanvasSize =
 BrainrotList.CanvasSize =
 	UDim2.new()
 
+BrainrotList.ScrollBarThickness = 3
+
 BrainrotList.Parent =
 	BrainrotPanel
 
-
 local BrainrotLayout =
-	Instance.new(
-		"UIListLayout"
-	)
+	Instance.new("UIListLayout")
 
 BrainrotLayout.Padding =
-	UDim.new(
-		0,
-		6
-	)
-
-BrainrotLayout.SortOrder =
-	Enum.SortOrder.LayoutOrder
+	UDim.new(0, 6)
 
 BrainrotLayout.Parent =
 	BrainrotList
-
 
 makeDraggable(
 	BrainrotPanel,
@@ -3293,285 +1873,205 @@ makeDraggable(
 	"BrainrotMenuPosition"
 )
 
-
 BrainrotClose.MouseButton1Click:
 	Connect(function()
 
-		BrainrotPanel.Visible =
-			false
+		BrainrotPanel.Visible = false
 
-
-		Saved.BrainrotMenuOpen =
-			false
-
-
+		Saved.BrainrotMenuOpen = false
 		Saved.BrainrotMenuPosition =
-			positionToTable(
+			savePos(
 				BrainrotPanel.Position
 			)
-
 
 		saveSettings()
 
 	end)
 
+local SelectedBeam
+local SelectedAttachment
+
+local function clearSelected()
+
+	if SelectedBeam then
+
+		SelectedBeam:Destroy()
+		SelectedBeam = nil
+
+	end
+
+	if SelectedAttachment then
+
+		SelectedAttachment:Destroy()
+		SelectedAttachment = nil
+
+	end
+
+end
+
+local function selectBrainrot(data)
+
+	clearSelected()
+
+	if
+		not data
+		or not data.Part
+		or not data.Part.Parent
+	then
+
+		return
+
+	end
+
+	SelectedAttachment =
+		Instance.new(
+			"Attachment"
+		)
+
+	SelectedAttachment.Parent =
+		data.Part
+
+	SelectedBeam =
+		Instance.new("Beam")
+
+	SelectedBeam.Attachment0 =
+		getRootAttachment()
+
+	SelectedBeam.Attachment1 =
+		SelectedAttachment
+
+	SelectedBeam.FaceCamera = true
+
+	SelectedBeam.Width0 = 0.3
+	SelectedBeam.Width1 = 0.3
+
+	SelectedBeam.Color =
+		ColorSequence.new(
+			Color3.fromRGB(
+				255,
+				200,
+				30
+			)
+		)
+
+	SelectedBeam.Parent =
+		WorldFolder
+
+end
 
 local function refreshBrainrotList()
 
-	for _, child in ipairs(
-		BrainrotList:
-			GetChildren()
+	for _, obj in ipairs(
+		BrainrotList:GetChildren()
 	) do
 
-		if child:IsA(
-			"GuiButton"
-		) then
-
-			child:
-				Destroy()
-
+		if obj:IsA("TextButton") then
+			obj:Destroy()
 		end
 
 	end
 
+	local entries = {}
 
-	local entries =
-		{}
-
-
-	for label,
-		data in pairs(
-			MoneyTargets
-		)
-	do
+	for label, data in pairs(
+		MoneyTargets
+	) do
 
 		if
-			label
-			and label.Parent
-
-			and data
-			and data.Value
-				>= MIN_MONEY
-
+			label.Parent
+			and data.Value >= MIN_MONEY
 			and data.Part
 			and data.Part.Parent
 		then
 
 			table.insert(
 				entries,
-
-				{
-					Label =
-						label,
-
-					Data =
-						data
-				}
-
+				data
 			)
 
 		end
 
 	end
 
-
 	table.sort(
 		entries,
-
 		function(a, b)
 
-			return
-				a.Data.Value
-				> b.Data.Value
+			return a.Value > b.Value
 
 		end
 	)
 
-
-	for index,
-		info in ipairs(
-			entries
-		)
-	do
+	for i, data in ipairs(
+		entries
+	) do
 
 		local row =
 			Instance.new(
 				"TextButton"
 			)
 
-		row.LayoutOrder =
-			index
+		row.LayoutOrder = i
 
 		row.Size =
 			UDim2.new(
 				1,
 				-4,
 				0,
-				52
+				50
 			)
 
 		row.BackgroundColor3 =
 			Color3.fromRGB(
-				24,
-				24,
-				29
+				23,
+				23,
+				28
 			)
 
-		row.BackgroundTransparency =
-			0.08
-
-		row.BorderSizePixel =
-			0
-
-		row.AutoButtonColor =
-			false
+		row.BorderSizePixel = 0
 
 		row.Text =
-			""
+			"#"
+			.. tostring(i)
+			.. "  "
+			.. data.Name
+			.. "\n"
+			.. data.Text
+
+		row.TextColor3 =
+			Color3.fromRGB(
+				230,
+				230,
+				230
+			)
+
+		row.Font =
+			Enum.Font.GothamBold
+
+		row.TextSize = 12
 
 		row.Parent =
 			BrainrotList
 
-
 		corner(
 			row,
-			10
+			9
 		)
-
-
-		local name =
-			Instance.new(
-				"TextLabel"
-			)
-
-		name.Position =
-			UDim2.new(
-				0,
-				10,
-				0,
-				4
-			)
-
-		name.Size =
-			UDim2.new(
-				1,
-				-20,
-				0,
-				22
-			)
-
-		name.BackgroundTransparency =
-			1
-
-		name.Text =
-			"#"
-			.. tostring(
-				index
-			)
-			.. "  "
-			.. (
-				info.Data.Name
-				or "UNKNOWN"
-			)
-
-		name.TextColor3 =
-			Color3.fromRGB(
-				235,
-				235,
-				235
-			)
-
-		name.Font =
-			Enum.Font.GothamBold
-
-		name.TextSize =
-			13
-
-		name.TextXAlignment =
-			Enum.TextXAlignment.Left
-
-		name.Parent =
-			row
-
-
-		local money =
-			Instance.new(
-				"TextLabel"
-			)
-
-		money.Position =
-			UDim2.new(
-				0,
-				10,
-				0,
-				27
-			)
-
-		money.Size =
-			UDim2.new(
-				1,
-				-20,
-				0,
-				20
-			)
-
-		money.BackgroundTransparency =
-			1
-
-		money.Text =
-			info.Data.Text
-
-		money.TextColor3 =
-			Color3.fromRGB(
-				70,
-				255,
-				100
-			)
-
-		money.Font =
-			Enum.Font.GothamBlack
-
-		money.TextSize =
-			13
-
-		money.TextXAlignment =
-			Enum.TextXAlignment.Left
-
-		money.Parent =
-			row
-
 
 		row.MouseButton1Click:
 			Connect(function()
 
-				local latest =
-					MoneyTargets[
-						info.Label
-					]
-
-
-				if latest then
-
-					selectBrainrot(
-						info.Label,
-						latest
-					)
-
-				end
+				selectBrainrot(data)
 
 			end)
 
 	end
 
-
 	BrainrotTitle.Text =
 		"BRAINROTS $20M+ • "
-		.. tostring(
-			#entries
-		)
+		.. tostring(#entries)
 
 end
-
 
 task.spawn(function()
 
@@ -3579,1283 +2079,26 @@ task.spawn(function()
 
 		refreshBrainrotList()
 
-
 		task.wait(
-			BRAINROT_LIST_RATE
+			BRAINROT_LIST_INTERVAL
 		)
 
 	end
 
 end)
-
-
---========================================================
--- PROGRESS UI
---========================================================
-
-local Progress =
-	Instance.new(
-		"Frame"
-	)
-
-Progress.AnchorPoint =
-	Vector2.new(
-		0.5,
-		0
-	)
-
-Progress.Position =
-	UDim2.new(
-		0.5,
-		0,
-		0,
-		25
-	)
-
-Progress.Size =
-	UDim2.new(
-		0,
-		470,
-		0,
-		76
-	)
-
-Progress.BackgroundColor3 =
-	Color3.fromRGB(
-		12,
-		12,
-		15
-	)
-
-Progress.BackgroundTransparency =
-	0.05
-
-Progress.BorderSizePixel =
-	0
-
-Progress.Visible =
-	false
-
-Progress.Parent =
-	Gui
-
-
-corner(
-	Progress,
-	17
-)
-
-
-stroke(
-	Progress,
-	3,
-	Color3.fromRGB(
-		255,
-		185,
-		25
-	)
-)
-
-
-local ProgressTitle =
-	Instance.new(
-		"TextLabel"
-	)
-
-ProgressTitle.Position =
-	UDim2.new(
-		0,
-		15,
-		0,
-		8
-	)
-
-ProgressTitle.Size =
-	UDim2.new(
-		1,
-		-100,
-		0,
-		27
-	)
-
-ProgressTitle.BackgroundTransparency =
-	1
-
-ProgressTitle.Text =
-	"AUTO STEAL"
-
-ProgressTitle.TextColor3 =
-	Color3.fromRGB(
-		255,
-		235,
-		145
-	)
-
-ProgressTitle.Font =
-	Enum.Font.GothamBlack
-
-ProgressTitle.TextSize =
-	17
-
-ProgressTitle.TextXAlignment =
-	Enum.TextXAlignment.Left
-
-ProgressTitle.Parent =
-	Progress
-
-
-local ProgressPercent =
-	Instance.new(
-		"TextLabel"
-	)
-
-ProgressPercent.AnchorPoint =
-	Vector2.new(
-		1,
-		0
-	)
-
-ProgressPercent.Position =
-	UDim2.new(
-		1,
-		-15,
-		0,
-		8
-	)
-
-ProgressPercent.Size =
-	UDim2.new(
-		0,
-		80,
-		0,
-		27
-	)
-
-ProgressPercent.BackgroundTransparency =
-	1
-
-ProgressPercent.Text =
-	"0%"
-
-ProgressPercent.TextColor3 =
-	Color3.fromRGB(
-		255,
-		220,
-		60
-	)
-
-ProgressPercent.Font =
-	Enum.Font.GothamBlack
-
-ProgressPercent.TextSize =
-	16
-
-ProgressPercent.Parent =
-	Progress
-
-
-local ProgressTrack =
-	Instance.new(
-		"Frame"
-	)
-
-ProgressTrack.Position =
-	UDim2.new(
-		0,
-		15,
-		0,
-		46
-	)
-
-ProgressTrack.Size =
-	UDim2.new(
-		1,
-		-30,
-		0,
-		16
-	)
-
-ProgressTrack.BackgroundColor3 =
-	Color3.fromRGB(
-		38,
-		38,
-		43
-	)
-
-ProgressTrack.BorderSizePixel =
-	0
-
-ProgressTrack.ClipsDescendants =
-	true
-
-ProgressTrack.Parent =
-	Progress
-
-
-corner(
-	ProgressTrack,
-	20
-)
-
-
-local ProgressFill =
-	Instance.new(
-		"Frame"
-	)
-
-ProgressFill.Size =
-	UDim2.new(
-		0,
-		0,
-		1,
-		0
-	)
-
-ProgressFill.BackgroundColor3 =
-	Color3.fromRGB(
-		255,
-		170,
-		20
-	)
-
-ProgressFill.BorderSizePixel =
-	0
-
-ProgressFill.Parent =
-	ProgressTrack
-
-
-corner(
-	ProgressFill,
-	20
-)
-
-
-local FillGradient =
-	Instance.new(
-		"UIGradient"
-	)
-
-FillGradient.Color =
-	ColorSequence.new({
-
-		ColorSequenceKeypoint.new(
-			0,
-
-			Color3.fromRGB(
-				255,
-				90,
-				0
-			)
-		),
-
-		ColorSequenceKeypoint.new(
-			0.5,
-
-			Color3.fromRGB(
-				255,
-				230,
-				30
-			)
-		),
-
-		ColorSequenceKeypoint.new(
-			1,
-
-			Color3.fromRGB(
-				255,
-				120,
-				0
-			)
-		)
-
-	})
-
-FillGradient.Parent =
-	ProgressFill
-
-
-task.spawn(function()
-
-	while Gui.Parent do
-
-		FillGradient.Offset =
-			Vector2.new(
-				-1,
-				0
-			)
-
-
-		local tween =
-			TweenService:
-				Create(
-
-					FillGradient,
-
-					TweenInfo.new(
-						1,
-						Enum.EasingStyle.Linear
-					),
-
-					{
-						Offset =
-							Vector2.new(
-								1,
-								0
-							)
-					}
-
-				)
-
-
-		tween:Play()
-
-		tween.Completed:
-			Wait()
-
-	end
-
-end)
-
-
---========================================================
--- PROMPT SYSTEM
---========================================================
-
-local Prompts =
-	{}
-
-
-local VisiblePrompts =
-	{}
-
-
-local PromptBlocked =
-	{}
-
-
-local function isStealPrompt(
-	prompt
-)
-
-	if
-		not prompt
-		or not prompt.Parent
-		or not prompt.Enabled
-	then
-
-		return false
-
-	end
-
-
-	local action =
-		tostring(
-			prompt.ActionText
-			or ""
-		):
-		lower()
-
-
-	local objectText =
-		tostring(
-			prompt.ObjectText
-			or ""
-		):
-		lower()
-
-
-	return
-		action:
-			find(
-				"steal",
-				1,
-				true
-			)
-			~= nil
-
-		or objectText:
-			find(
-				"steal",
-				1,
-				true
-			)
-			~= nil
-
-end
-
-
-local function addPrompt(
-	object
-)
-
-	if object:IsA(
-		"ProximityPrompt"
-	) then
-
-		Prompts[
-			object
-		] =
-			true
-
-	end
-
-end
-
-
-for _, object in ipairs(
-	workspace:
-		GetDescendants()
-) do
-
-	addPrompt(
-		object
-	)
-
-end
-
-
-workspace.DescendantAdded:
-	Connect(
-		addPrompt
-	)
-
-
-workspace.DescendantRemoving:
-	Connect(function(object)
-
-		Prompts[
-			object
-		] =
-			nil
-
-
-		VisiblePrompts[
-			object
-		] =
-			nil
-
-
-		PromptBlocked[
-			object
-		] =
-			nil
-
-	end)
-
-
-ProximityPromptService.PromptShown:
-	Connect(function(prompt)
-
-		VisiblePrompts[
-			prompt
-		] =
-			true
-
-	end)
-
-
-ProximityPromptService.PromptHidden:
-	Connect(function(prompt)
-
-		VisiblePrompts[
-			prompt
-		] =
-			false
-
-	end)
-
-
-local function promptPosition(
-	prompt
-)
-
-	if
-		not prompt
-		or not prompt.Parent
-	then
-
-		return nil
-
-	end
-
-
-	if prompt.Parent:IsA(
-		"Attachment"
-	) then
-
-		return
-			prompt.Parent.WorldPosition
-
-	end
-
-
-	if prompt.Parent:IsA(
-		"BasePart"
-	) then
-
-		return
-			prompt.Parent.Position
-
-	end
-
-
-	local model =
-		prompt.Parent:
-			FindFirstAncestorWhichIsA(
-				"Model"
-			)
-
-
-	if model then
-
-		local part =
-			model.PrimaryPart
-
-			or model:
-				FindFirstChildWhichIsA(
-					"BasePart",
-					true
-				)
-
-
-		if part then
-			return part.Position
-		end
-
-	end
-
-
-	return nil
-
-end
-
-
-local function promptInRange(
-	prompt
-)
-
-	if not isStealPrompt(
-		prompt
-	) then
-
-		return false
-
-	end
-
-
-	local root =
-		getRoot()
-
-
-	local position =
-		promptPosition(
-			prompt
-		)
-
-
-	if
-		not root
-		or not position
-	then
-
-		return false
-
-	end
-
-
-	local range =
-		tonumber(
-			prompt.MaxActivationDistance
-		)
-		or 10
-
-
-	return
-		(
-			root.Position
-			- position
-		).Magnitude
-
-		<= range
-			+ 0.75
-
-end
-
-
-local function promptUsable(
-	prompt
-)
-
-	if not promptInRange(
-		prompt
-	) then
-
-		return false
-
-	end
-
-
-	if PromptBlocked[
-		prompt
-	] then
-
-		return false
-
-	end
-
-
-	if
-		VisiblePrompts[
-			prompt
-		]
-		== false
-	then
-
-		return false
-
-	end
-
-
-	return true
-
-end
-
-
-local function getNearestSteal()
-
-	local root =
-		getRoot()
-
-
-	if not root then
-		return nil
-	end
-
-
-	local best =
-		nil
-
-
-	local bestDistance =
-		math.huge
-
-
-	for prompt in pairs(
-		Prompts
-	) do
-
-		if promptUsable(
-			prompt
-		) then
-
-			local position =
-				promptPosition(
-					prompt
-				)
-
-
-			if position then
-
-				local distance =
-					(
-						root.Position
-						- position
-					).Magnitude
-
-
-				if distance < bestDistance then
-
-					bestDistance =
-						distance
-
-
-					best =
-						prompt
-
-				end
-
-			end
-
-		end
-
-	end
-
-
-	return best
-
-end
-
-
-local function promptMoney(
-	prompt
-)
-
-	local position =
-		promptPosition(
-			prompt
-		)
-
-
-	if not position then
-		return nil
-	end
-
-
-	local bestDistance =
-		math.huge
-
-
-	local result =
-		nil
-
-
-	for _, data in pairs(
-		MoneyTargets
-	) do
-
-		if
-			data.Part
-			and data.Part.Parent
-		then
-
-			local distance =
-				(
-					position
-					- data.Part.Position
-				).Magnitude
-
-
-			if
-				distance < bestDistance
-
-				and distance <= 25
-			then
-
-				bestDistance =
-					distance
-
-
-				result =
-					data.Value
-
-			end
-
-		end
-
-	end
-
-
-	return result
-
-end
-
-
-local function getHighestSteal()
-
-	local best =
-		nil
-
-
-	local bestMoney =
-		-math.huge
-
-
-	for prompt in pairs(
-		Prompts
-	) do
-
-		if promptUsable(
-			prompt
-		) then
-
-			local money =
-				promptMoney(
-					prompt
-				)
-
-
-			if
-				money
-				and money > bestMoney
-			then
-
-				bestMoney =
-					money
-
-
-				best =
-					prompt
-
-			end
-
-		end
-
-	end
-
-
-	return
-		best,
-		bestMoney
-
-end
-
-
---========================================================
--- STEAL
---========================================================
-
-local stealing =
-	false
-
-
-local currentPrompt =
-	nil
-
-
-local stealGeneration =
-	0
-
-
-local function hideProgress()
-
-	Progress.Visible =
-		false
-
-
-	ProgressFill.Size =
-		UDim2.new(
-			0,
-			0,
-			1,
-			0
-		)
-
-
-	ProgressPercent.Text =
-		"0%"
-
-end
-
-
-local function cancelCurrentHold()
-
-	stealGeneration +=
-		1
-
-
-	if
-		currentPrompt
-		and currentPrompt.Parent
-	then
-
-		pcall(function()
-
-			currentPrompt:
-				InputHoldEnd()
-
-		end)
-
-	end
-
-
-	currentPrompt =
-		nil
-
-
-	stealing =
-		false
-
-
-	hideProgress()
-
-end
-
-
-local function performHold(
-	prompt,
-	title,
-	money
-)
-
-	if stealing then
-		return
-	end
-
-
-	if not promptUsable(
-		prompt
-	) then
-
-		return
-
-	end
-
-
-	stealing =
-		true
-
-
-	currentPrompt =
-		prompt
-
-
-	stealGeneration +=
-		1
-
-
-	local generation =
-		stealGeneration
-
-
-	local startedHold =
-		false
-
-
-	local triggered =
-		false
-
-
-	local startConnection =
-		prompt.PromptButtonHoldBegan:
-			Connect(function()
-
-				startedHold =
-					true
-
-			end)
-
-
-	local triggerConnection =
-		prompt.Triggered:
-			Connect(function()
-
-				triggered =
-					true
-
-			end)
-
-
-	local ok =
-		pcall(function()
-
-			prompt:
-				InputHoldBegin()
-
-		end)
-
-
-	if not ok then
-
-		startConnection:
-			Disconnect()
-
-
-		triggerConnection:
-			Disconnect()
-
-
-		currentPrompt =
-			nil
-
-
-		stealing =
-			false
-
-
-		return
-
-	end
-
-
-	local startDeadline =
-		os.clock()
-		+ HOLD_START_TIMEOUT
-
-
-	while
-		not startedHold
-
-		and not triggered
-
-		and prompt.Parent
-
-		and os.clock()
-			< startDeadline
-	do
-
-		RunService.Heartbeat:
-			Wait()
-
-	end
-
-
-	if
-		not startedHold
-		and not triggered
-	then
-
-		pcall(function()
-
-			prompt:
-				InputHoldEnd()
-
-		end)
-
-
-		startConnection:
-			Disconnect()
-
-
-		triggerConnection:
-			Disconnect()
-
-
-		currentPrompt =
-			nil
-
-
-		stealing =
-			false
-
-
-		return
-
-	end
-
-
-	Progress.Visible =
-		true
-
-
-	ProgressTitle.Text =
-		title
-		.. (
-			money
-
-			and (
-				" • "
-				.. formatMoney(
-					money
-				)
-			)
-
-			or ""
-		)
-
-
-	local duration =
-		math.max(
-			prompt.HoldDuration,
-			0.01
-		)
-
-
-	local started =
-		os.clock()
-
-
-	while
-		generation
-			== stealGeneration
-
-		and prompt.Parent
-
-		and prompt.Enabled
-
-		and promptInRange(
-			prompt
-		)
-
-		and not triggered
-
-		and os.clock()
-			- started
-
-			<= duration
-				+ HOLD_TRIGGER_GRACE
-	do
-
-		local percent =
-			math.clamp(
-
-				(
-					os.clock()
-					- started
-				)
-				/ duration,
-
-				0,
-				1
-
-			)
-
-
-		ProgressFill.Size =
-			UDim2.new(
-				percent,
-				0,
-				1,
-				0
-			)
-
-
-		ProgressPercent.Text =
-			tostring(
-				math.floor(
-					percent
-					* 100
-				)
-			)
-			.. "%"
-
-
-		RunService.RenderStepped:
-			Wait()
-
-	end
-
-
-	pcall(function()
-
-		prompt:
-			InputHoldEnd()
-
-	end)
-
-
-	startConnection:
-		Disconnect()
-
-
-	triggerConnection:
-		Disconnect()
-
-
-	currentPrompt =
-		nil
-
-
-	stealing =
-		false
-
-
-	hideProgress()
-
-
-	if triggered then
-
-		PromptBlocked[
-			prompt
-		] =
-			true
-
-
-		task.delay(
-			RESET_FALLBACK,
-
-			function()
-
-				PromptBlocked[
-					prompt
-				] =
-					nil
-
-			end
-		)
-
-	else
-
-		task.wait(
-			FAILED_HOLD_RETRY
-		)
-
-	end
-
-end
-
-
-task.spawn(function()
-
-	while Gui.Parent do
-
-		if not stealing then
-
-			if nearestEnabled then
-
-				local prompt =
-					getNearestSteal()
-
-
-				if prompt then
-
-					performHold(
-
-						prompt,
-
-						"NEAREST STEAL",
-
-						promptMoney(
-							prompt
-						)
-
-					)
-
-				end
-
-
-			elseif highestEnabled then
-
-				local prompt,
-					money =
-					getHighestSteal()
-
-
-				if prompt then
-
-					performHold(
-
-						prompt,
-
-						"HIGHEST MONEY",
-
-						money
-
-					)
-
-				end
-
-			end
-
-		end
-
-
-		task.wait(
-			STEAL_SCAN_RATE
-		)
-
-	end
-
-end)
-
 
 --========================================================
 -- RADAR MENU
 --========================================================
 
 local RadarPanel =
-	Instance.new(
-		"Frame"
-	)
+	Instance.new("Frame")
 
 RadarPanel.AnchorPoint =
-	Vector2.new(
-		1,
-		0.5
-	)
+	Vector2.new(1, 0.5)
 
 RadarPanel.Position =
-	tableToPosition(
+	loadPos(
 
 		Saved.RadarMenuPosition,
 
@@ -4880,44 +2123,34 @@ RadarPanel.BackgroundColor3 =
 	Color3.fromRGB(
 		12,
 		12,
-		15
+		16
 	)
 
-RadarPanel.BackgroundTransparency =
-	0.12
-
-RadarPanel.BorderSizePixel =
-	0
+RadarPanel.BorderSizePixel = 0
 
 RadarPanel.Visible =
-	Saved.RadarMenuOpen
-	~= false
+	Saved.RadarMenuOpen ~= false
 
 RadarPanel.Parent =
 	Gui
-
 
 corner(
 	RadarPanel,
 	16
 )
 
-
 stroke(
 	RadarPanel,
 	2,
 	Color3.fromRGB(
-		210,
-		210,
+		200,
+		200,
 		210
 	)
 )
 
-
 local RadarTitle =
-	Instance.new(
-		"TextButton"
-	)
+	Instance.new("TextButton")
 
 RadarTitle.Size =
 	UDim2.new(
@@ -4927,42 +2160,30 @@ RadarTitle.Size =
 		42
 	)
 
-RadarTitle.BackgroundTransparency =
-	1
+RadarTitle.BackgroundTransparency = 1
 
-RadarTitle.AutoButtonColor =
-	false
-
-RadarTitle.Text =
-	"RADAR"
+RadarTitle.Text = "RADAR"
 
 RadarTitle.TextColor3 =
 	Color3.fromRGB(
-		235,
-		235,
-		235
+		230,
+		230,
+		230
 	)
 
 RadarTitle.Font =
 	Enum.Font.GothamBlack
 
-RadarTitle.TextSize =
-	16
+RadarTitle.TextSize = 15
 
 RadarTitle.Parent =
 	RadarPanel
 
-
 local RadarClose =
-	Instance.new(
-		"TextButton"
-	)
+	Instance.new("TextButton")
 
 RadarClose.AnchorPoint =
-	Vector2.new(
-		1,
-		0
-	)
+	Vector2.new(1, 0)
 
 RadarClose.Position =
 	UDim2.new(
@@ -4987,39 +2208,30 @@ RadarClose.BackgroundColor3 =
 		35
 	)
 
-RadarClose.BorderSizePixel =
-	0
+RadarClose.BorderSizePixel = 0
 
-RadarClose.Text =
-	"×"
+RadarClose.Text = "×"
 
 RadarClose.TextColor3 =
-	Color3.new(
-		1,
-		1,
-		1
-	)
+	Color3.new(1, 1, 1)
 
 RadarClose.Font =
 	Enum.Font.GothamBlack
 
-RadarClose.TextSize =
-	21
+RadarClose.TextSize = 20
 
 RadarClose.Parent =
 	RadarPanel
 
-
 corner(
 	RadarClose,
-	9
+	8
 )
-
 
 local RadarList =
 	Instance.new(
 		"ScrollingFrame"
-	)
+		)
 
 RadarList.Position =
 	UDim2.new(
@@ -5037,14 +2249,8 @@ RadarList.Size =
 		-52
 	)
 
-RadarList.BackgroundTransparency =
-	1
-
-RadarList.BorderSizePixel =
-	0
-
-RadarList.ScrollBarThickness =
-	3
+RadarList.BackgroundTransparency = 1
+RadarList.BorderSizePixel = 0
 
 RadarList.AutomaticCanvasSize =
 	Enum.AutomaticSize.Y
@@ -5052,24 +2258,19 @@ RadarList.AutomaticCanvasSize =
 RadarList.CanvasSize =
 	UDim2.new()
 
+RadarList.ScrollBarThickness = 3
+
 RadarList.Parent =
 	RadarPanel
 
-
 local RadarLayout =
-	Instance.new(
-		"UIListLayout"
-	)
+	Instance.new("UIListLayout")
 
 RadarLayout.Padding =
-	UDim.new(
-		0,
-		5
-	)
+	UDim.new(0, 5)
 
 RadarLayout.Parent =
 	RadarList
-
 
 makeDraggable(
 	RadarPanel,
@@ -5077,75 +2278,53 @@ makeDraggable(
 	"RadarMenuPosition"
 )
 
-
 RadarClose.MouseButton1Click:
 	Connect(function()
 
-		RadarPanel.Visible =
-			false
+		RadarPanel.Visible = false
 
-
-		Saved.RadarMenuOpen =
-			false
-
-
+		Saved.RadarMenuOpen = false
 		Saved.RadarMenuPosition =
-			positionToTable(
+			savePos(
 				RadarPanel.Position
 			)
-
 
 		saveSettings()
 
 	end)
-
 
 --========================================================
 -- RADAR CIRCLE
 --========================================================
 
 local RadarCircle =
-	Instance.new(
-		"Part"
-	)
+	Instance.new("Part")
 
 RadarCircle.Name =
-	"PlayerRadar"
+	"FTX_RADAR_CIRCLE"
 
 RadarCircle.Shape =
 	Enum.PartType.Cylinder
 
 RadarCircle.Size =
 	Vector3.new(
-		0.06,
+		0.05,
 		GREEN_RANGE * 2,
 		GREEN_RANGE * 2
 	)
 
-RadarCircle.Anchored =
-	true
+RadarCircle.Anchored = true
+RadarCircle.CanCollide = false
+RadarCircle.CanQuery = false
+RadarCircle.CanTouch = false
 
-RadarCircle.CanCollide =
-	false
-
-RadarCircle.CanTouch =
-	false
-
-RadarCircle.CanQuery =
-	false
-
-RadarCircle.CastShadow =
-	false
+RadarCircle.CastShadow = false
 
 RadarCircle.Material =
 	Enum.Material.SmoothPlastic
 
 RadarCircle.Color =
-	Color3.new(
-		1,
-		1,
-		1
-	)
+	Color3.new(1, 1, 1)
 
 RadarCircle.Transparency =
 	radarCircleEnabled
@@ -5155,94 +2334,61 @@ RadarCircle.Transparency =
 RadarCircle.Parent =
 	WorldFolder
 
-
 --========================================================
 -- PLAYER ESP
 --========================================================
 
-local PlayerESP =
-	{}
+local PlayerESP = {}
 
-
-local function setupPlayer(
-	player
-)
+local function setupPlayer(player)
 
 	if player == LP then
 		return
 	end
 
-
-	if PlayerESP[
-		player
-	] then
-
+	if PlayerESP[player] then
 		return
-
 	end
 
+	PlayerESP[player] = {}
 
-	local data = {
+	local data =
+		PlayerESP[player]
 
-		Distance =
-			math.huge
-
-	}
-
-
-	PlayerESP[
-		player
-	] =
-		data
-
-
-	local function setupCharacter(
-		character
-	)
+	local function characterAdded(char)
 
 		if data.Highlight then
 			data.Highlight:Destroy()
 		end
 
-
 		if data.Billboard then
 			data.Billboard:Destroy()
 		end
 
-
 		local head =
-			character:
-				WaitForChild(
-					"Head",
-					5
-				)
-
+			char:WaitForChild(
+				"Head",
+				5
+			)
 
 		if not head then
 			return
 		end
-
 
 		local billboard =
 			Instance.new(
 				"BillboardGui"
 			)
 
-		billboard.Adornee =
-			head
-
-		billboard.AlwaysOnTop =
-			true
-
-		billboard.MaxDistance =
-			100000
+		billboard.Adornee = head
+		billboard.AlwaysOnTop = true
 
 		billboard.Size =
 			UDim2.new(
 				0,
 				300,
 				0,
-				70
+				65
 			)
 
 		billboard.StudsOffset =
@@ -5252,9 +2398,7 @@ local function setupPlayer(
 				0
 			)
 
-		billboard.Parent =
-			Gui
-
+		billboard.Parent = Gui
 
 		local name =
 			Instance.new(
@@ -5267,8 +2411,7 @@ local function setupPlayer(
 				1
 			)
 
-		name.BackgroundTransparency =
-			1
+		name.BackgroundTransparency = 1
 
 		name.Text =
 			player.Name
@@ -5280,560 +2423,353 @@ local function setupPlayer(
 				1
 			)
 
-		name.TextStrokeTransparency =
-			0.1
+		name.TextStrokeTransparency = 0.1
 
 		name.Font =
 			Enum.Font.GothamBlack
 
-		name.TextScaled =
-			true
+		name.TextScaled = true
 
 		name.Parent =
 			billboard
 
-
 		local highlight =
-			Instance.new(
-				"Highlight"
-			)
+			Instance.new("Highlight")
 
-		highlight.Adornee =
-			character
+		highlight.Adornee = char
 
 		highlight.DepthMode =
 			Enum.HighlightDepthMode.AlwaysOnTop
 
-		highlight.FillTransparency =
-			0.2
+		highlight.FillTransparency = 0.2
+		highlight.OutlineTransparency = 0
 
-		highlight.OutlineTransparency =
-			0
+		highlight.Enabled = false
 
-		highlight.Enabled =
-			false
+		highlight.Parent = char
 
-		highlight.Parent =
-			character
-
-
-		data.Billboard =
-			billboard
-
-
-		data.Name =
-			name
-
-
-		data.Highlight =
-			highlight
+		data.Billboard = billboard
+		data.Label = name
+		data.Highlight = highlight
 
 	end
-
 
 	if player.Character then
 
 		task.spawn(
-			setupCharacter,
+			characterAdded,
 			player.Character
 		)
 
 	end
 
-
 	player.CharacterAdded:
-		Connect(
-			setupCharacter
-		)
+		Connect(characterAdded)
 
 end
 
-
-for _, player in ipairs(
-	Players:
-		GetPlayers()
+for _, p in ipairs(
+	Players:GetPlayers()
 ) do
 
-	setupPlayer(
-		player
-	)
+	setupPlayer(p)
 
 end
 
-
 Players.PlayerAdded:
-	Connect(
-		setupPlayer
-	)
-
-
-Players.PlayerRemoving:
-	Connect(function(player)
-
-		local data =
-			PlayerESP[
-				player
-			]
-
-
-		if data then
-
-			if data.Highlight then
-				data.Highlight:Destroy()
-			end
-
-
-			if data.Billboard then
-				data.Billboard:Destroy()
-			end
-
-		end
-
-
-		PlayerESP[
-			player
-		] =
-			nil
-
-	end)
-
+	Connect(setupPlayer)
 
 --========================================================
 -- RADAR UPDATE
 --========================================================
 
-local lastRadarUpdate =
-	0
+local lastRadar = 0
 
+RunService.Heartbeat:Connect(function()
 
-RunService.Heartbeat:
-	Connect(function()
+	local root = getRoot()
 
-		local root =
-			getRoot()
+	if not root then
+		return
+	end
 
+	if radarCircleEnabled then
 
-		if not root then
-			return
-		end
+		RadarCircle.Transparency = 0.7
 
-
-		if radarCircleEnabled then
-
-			RadarCircle.Transparency =
-				0.7
-
-
-			RadarCircle.CFrame =
-				CFrame.new(
-
-					root.Position.X,
-
-					root.Position.Y
-						- 2.7,
-
-					root.Position.Z
-
-				)
-
-				* CFrame.Angles(
-					0,
-					0,
-					math.rad(
-						90
-					)
-				)
-
-		else
-
-			RadarCircle.Transparency =
-				1
-
-		end
-
-
-		local nearby =
-			{}
-
-
-		for player,
-			data in pairs(
-				PlayerESP
+		RadarCircle.CFrame =
+			CFrame.new(
+				root.Position.X,
+				root.Position.Y - 2.7,
+				root.Position.Z
 			)
-		do
+			* CFrame.Angles(
+				0,
+				0,
+				math.rad(90)
+			)
 
-			local otherRoot =
-				player.Character
+	else
 
-				and player.Character:
-					FindFirstChild(
-						"HumanoidRootPart"
-					)
+		RadarCircle.Transparency = 1
 
+	end
 
-			if
-				otherRoot
-				and data.Highlight
-			then
+	local nearby = {}
 
-				local distance =
-					(
-						otherRoot.Position
-						- root.Position
-					).Magnitude
+	for player, data in pairs(
+		PlayerESP
+	) do
 
-
-				data.Distance =
-					distance
-
-
-				if not playerHighlightEnabled then
-
-					data.Highlight.Enabled =
-						false
-
-
-					data.Name.TextColor3 =
-						Color3.new(
-							1,
-							1,
-							1
-						)
-
-
-				elseif distance <= RED_RANGE then
-
-					data.Highlight.Enabled =
-						true
-
-
-					data.Highlight.FillColor =
-						Color3.fromRGB(
-							255,
-							25,
-							25
-						)
-
-
-					data.Highlight.OutlineColor =
-						Color3.fromRGB(
-							255,
-							0,
-							0
-						)
-
-
-					data.Name.TextColor3 =
-						Color3.fromRGB(
-							255,
-							55,
-							55
-						)
-
-
-				elseif distance <= GREEN_RANGE then
-
-					data.Highlight.Enabled =
-						true
-
-
-					data.Highlight.FillColor =
-						Color3.fromRGB(
-							40,
-							255,
-							70
-						)
-
-
-					data.Highlight.OutlineColor =
-						Color3.fromRGB(
-							20,
-							255,
-							45
-						)
-
-
-					data.Name.TextColor3 =
-						Color3.fromRGB(
-							70,
-							255,
-							95
-						)
-
-
-				else
-
-					data.Highlight.Enabled =
-						false
-
-
-					data.Name.TextColor3 =
-						Color3.new(
-							1,
-							1,
-							1
-						)
-
-				end
-
-
-				if distance <= GREEN_RANGE then
-
-					table.insert(
-						nearby,
-
-						{
-							Player =
-								player,
-
-							Distance =
-								distance
-						}
-
-					)
-
-				end
-
-			end
-
-		end
-
+		local other =
+			player.Character
+			and player.Character:
+				FindFirstChild(
+					"HumanoidRootPart"
+				)
 
 		if
-			os.clock()
-			- lastRadarUpdate
-			< RADAR_LIST_RATE
+			other
+			and data.Highlight
 		then
 
-			return
+			local distance =
+				(
+					other.Position
+					- root.Position
+				).Magnitude
 
-		end
+			if not playerHighlightEnabled then
 
+				data.Highlight.Enabled = false
 
-		lastRadarUpdate =
-			os.clock()
+				data.Label.TextColor3 =
+					Color3.new(
+						1,
+						1,
+						1
+					)
 
+			elseif distance <= RED_RANGE then
 
-		for _, object in ipairs(
-			RadarList:
-				GetChildren()
-		) do
+				data.Highlight.Enabled = true
 
-			if object:IsA(
-				"Frame"
-			) then
-
-				object:
-					Destroy()
-
-			end
-
-		end
-
-
-		table.sort(
-			nearby,
-
-			function(a, b)
-
-				return
-					a.Distance
-					< b.Distance
-
-			end
-		)
-
-
-		for _, info in ipairs(
-			nearby
-		) do
-
-			local row =
-				Instance.new(
-					"Frame"
-				)
-
-			row.Size =
-				UDim2.new(
-					1,
-					-4,
-					0,
-					38
-				)
-
-			row.BackgroundColor3 =
-				Color3.fromRGB(
-					24,
-					24,
-					29
-				)
-
-			row.BorderSizePixel =
-				0
-
-			row.Parent =
-				RadarList
-
-
-			corner(
-				row,
-				9
-			)
-
-
-			local text =
-				Instance.new(
-					"TextLabel"
-				)
-
-			text.Position =
-				UDim2.new(
-					0,
-					10,
-					0,
-					0
-				)
-
-			text.Size =
-				UDim2.new(
-					1,
-					-20,
-					1,
-					0
-				)
-
-			text.BackgroundTransparency =
-				1
-
-			text.Text =
-				info.Player.Name
-				.. " • "
-				.. string.format(
-					"%.1f",
-					info.Distance
-				)
-				.. " studs"
-
-			text.Font =
-				Enum.Font.GothamBold
-
-			text.TextSize =
-				13
-
-			text.TextXAlignment =
-				Enum.TextXAlignment.Left
-
-
-			if
-				playerHighlightEnabled
-
-				and info.Distance <= RED_RANGE
-			then
-
-				text.TextColor3 =
+				data.Highlight.FillColor =
 					Color3.fromRGB(
 						255,
-						65,
-						65
+						30,
+						30
+					)
+
+				data.Highlight.OutlineColor =
+					Color3.fromRGB(
+						255,
+						0,
+						0
+					)
+
+				data.Label.TextColor3 =
+					Color3.fromRGB(
+						255,
+						70,
+						70
+					)
+
+			elseif distance <= GREEN_RANGE then
+
+				data.Highlight.Enabled = true
+
+				data.Highlight.FillColor =
+					Color3.fromRGB(
+						40,
+						255,
+						70
+					)
+
+				data.Highlight.OutlineColor =
+					Color3.fromRGB(
+						20,
+						255,
+						40
+					)
+
+				data.Label.TextColor3 =
+					Color3.fromRGB(
+						70,
+						255,
+						95
 					)
 
 			else
 
-				text.TextColor3 =
-					Color3.fromRGB(
-						80,
-						255,
-						105
+				data.Highlight.Enabled = false
+
+				data.Label.TextColor3 =
+					Color3.new(
+						1,
+						1,
+						1
 					)
 
 			end
 
+			if distance <= GREEN_RANGE then
 
-			text.Parent =
-				row
+				table.insert(
+					nearby,
+					{
+						Player = player,
+						Distance = distance
+					}
+				)
+
+			end
 
 		end
 
-	end)
+	end
 
+	if
+		os.clock() - lastRadar
+		< RADAR_UPDATE_INTERVAL
+	then
+
+		return
+
+	end
+
+	lastRadar = os.clock()
+
+	for _, obj in ipairs(
+		RadarList:GetChildren()
+	) do
+
+		if obj:IsA("TextLabel") then
+			obj:Destroy()
+		end
+
+	end
+
+	table.sort(
+		nearby,
+		function(a, b)
+
+			return
+				a.Distance
+				< b.Distance
+
+		end
+	)
+
+	for _, info in ipairs(
+		nearby
+	) do
+
+		local text =
+			Instance.new(
+				"TextLabel"
+			)
+
+		text.Size =
+			UDim2.new(
+				1,
+				-4,
+				0,
+				36
+			)
+
+		text.BackgroundColor3 =
+			Color3.fromRGB(
+				23,
+				23,
+				28
+			)
+
+		text.BorderSizePixel = 0
+
+		text.Text =
+			info.Player.Name
+			.. " • "
+			.. string.format(
+				"%.1f studs",
+				info.Distance
+			)
+
+		text.TextColor3 =
+			info.Distance <= RED_RANGE
+			and Color3.fromRGB(
+				255,
+				70,
+				70
+			)
+
+			or Color3.fromRGB(
+				80,
+				255,
+				100
+			)
+
+		text.Font =
+			Enum.Font.GothamBold
+
+		text.TextSize = 12
+
+		text.Parent =
+			RadarList
+
+		corner(text, 8)
+
+	end
+
+end)
 
 --========================================================
 -- BASE LINE
 --========================================================
 
-local BasePart =
-	nil
-
-
-local BaseBeam =
-	nil
-
-
-local BaseAttachment =
-	nil
-
+local BaseBeam
+local BaseAttachment
+local BasePart
 
 local function findOwnerBase()
 
-	local owner =
-		OWNER_NAME:
-			lower()
-
+	local target =
+		OWNER_NAME:lower()
 
 	for _, gui in ipairs(
-		workspace:
-			GetDescendants()
+		workspace:GetDescendants()
 	) do
 
 		if
-			gui:IsA(
-				"BillboardGui"
-			)
-
-			or gui:IsA(
-				"SurfaceGui"
-			)
+			gui:IsA("BillboardGui")
+			or gui:IsA("SurfaceGui")
 		then
 
-			for _, object in ipairs(
-				gui:
-					GetDescendants()
+			for _, label in ipairs(
+				gui:GetDescendants()
 			) do
 
 				if
 					(
-						object:IsA(
-							"TextLabel"
-						)
-
-						or object:IsA(
-							"TextButton"
-						)
+						label:IsA("TextLabel")
+						or label:IsA("TextButton")
 					)
-
 					and tostring(
-						object.Text
-						or ""
+						label.Text or ""
 					):
 						lower():
 						find(
-							owner,
+							target,
 							1,
 							true
 						)
 				then
 
 					local part =
-						getWorldPart(
-							gui
-						)
-
+						getWorldPart(gui)
 
 					if part then
-
-						return
-							part
-
+						return part
 					end
 
 				end
@@ -5844,11 +2780,7 @@ local function findOwnerBase()
 
 	end
 
-
-	return nil
-
 end
-
 
 task.spawn(function()
 
@@ -5856,67 +2788,45 @@ task.spawn(function()
 
 		if
 			not BasePart
-
 			or not BasePart.Parent
 		then
 
 			local found =
 				findOwnerBase()
 
-
 			if found then
 
 				if BaseBeam then
-					BaseBeam:
-						Destroy()
+					BaseBeam:Destroy()
 				end
-
 
 				if BaseAttachment then
-					BaseAttachment:
-						Destroy()
+					BaseAttachment:Destroy()
 				end
 
-
-				BasePart =
-					found
-
+				BasePart = found
 
 				BaseAttachment =
 					Instance.new(
 						"Attachment"
 					)
 
-
 				BaseAttachment.Parent =
 					found
 
-
 				BaseBeam =
-					Instance.new(
-						"Beam"
-					)
-
+					Instance.new("Beam")
 
 				BaseBeam.Attachment0 =
 					getRootAttachment()
 
-
 				BaseBeam.Attachment1 =
 					BaseAttachment
 
+				BaseBeam.FaceCamera = true
 
-				BaseBeam.FaceCamera =
-					true
-
-
-				BaseBeam.Width0 =
-					0.65
-
-
-				BaseBeam.Width1 =
-					0.65
-
+				BaseBeam.Width0 = 0.65
+				BaseBeam.Width1 = 0.65
 
 				BaseBeam.Color =
 					ColorSequence.new(
@@ -5927,7 +2837,6 @@ task.spawn(function()
 						)
 					)
 
-
 				BaseBeam.Parent =
 					WorldFolder
 
@@ -5935,47 +2844,37 @@ task.spawn(function()
 
 		end
 
+		if BaseBeam then
 
-		if
-			BaseBeam
-
-			and getRootAttachment()
-		then
-
-			BaseBeam.Attachment0 =
+			local rootAttachment =
 				getRootAttachment()
+
+			if rootAttachment then
+
+				BaseBeam.Attachment0 =
+					rootAttachment
+
+			end
 
 		end
 
-
-		task.wait(
-			1
-		)
+		task.wait(1)
 
 	end
 
 end)
 
-
 --========================================================
 -- AUTO KICK
 --========================================================
 
-local kickTriggered =
-	false
+local kickTriggered = false
+local watchedUI = {}
 
-
-local watchedUI =
-	{}
-
-
-local function checkYouStole(
-	text
-)
+local function checkStole(text)
 
 	if
 		not autoKickEnabled
-
 		or kickTriggered
 	then
 
@@ -5983,11 +2882,9 @@ local function checkYouStole(
 
 	end
 
-
 	if typeof(text) ~= "string" then
 		return
 	end
-
 
 	if
 		text:
@@ -5999,90 +2896,381 @@ local function checkYouStole(
 			)
 	then
 
-		kickTriggered =
-			true
+		kickTriggered = true
 
-
-		LP:Kick(
-			"You stole"
-		)
+		LP:Kick("You stole")
 
 	end
 
 end
 
+local function watchUI(obj)
 
-local function watchUI(
-	object
-)
-
-	if watchedUI[
-		object
-	] then
-
+	if watchedUI[obj] then
 		return
-
 	end
 
-
 	if
-		not object:IsA(
-			"TextLabel"
-		)
-
-		and not object:IsA(
-			"TextButton"
-		)
+		not obj:IsA("TextLabel")
+		and not obj:IsA("TextButton")
 	then
 
 		return
 
 	end
 
+	watchedUI[obj] = true
 
-	watchedUI[
-		object
-	] =
-		true
+	checkStole(obj.Text)
 
-
-	checkYouStole(
-		object.Text
-	)
-
-
-	object:
-		GetPropertyChangedSignal(
-			"Text"
-		):
+	obj:
+		GetPropertyChangedSignal("Text"):
 		Connect(function()
 
-			checkYouStole(
-				object.Text
-			)
+			checkStole(obj.Text)
 
 		end)
 
 end
 
-
-for _, object in ipairs(
-	PlayerGui:
-		GetDescendants()
+for _, obj in ipairs(
+	PlayerGui:GetDescendants()
 ) do
 
-	watchUI(
-		object
-	)
+	watchUI(obj)
 
 end
 
-
 PlayerGui.DescendantAdded:
-	Connect(
-		watchUI
-	)
+	Connect(watchUI)
 
+--========================================================
+-- STEAL PROMPTS
+--========================================================
+
+local Prompts = {}
+
+local function addPrompt(obj)
+
+	if obj:IsA("ProximityPrompt") then
+		Prompts[obj] = true
+	end
+
+end
+
+for _, obj in ipairs(
+	workspace:GetDescendants()
+) do
+
+	addPrompt(obj)
+
+end
+
+workspace.DescendantAdded:
+	Connect(addPrompt)
+
+local function isStealPrompt(prompt)
+
+	if
+		not prompt
+		or not prompt.Parent
+		or not prompt.Enabled
+	then
+
+		return false
+
+	end
+
+	local action =
+		tostring(
+			prompt.ActionText or ""
+		):
+		lower()
+
+	local objectText =
+		tostring(
+			prompt.ObjectText or ""
+		):
+		lower()
+
+	return
+		action:find(
+			"steal",
+			1,
+			true
+		)
+		or objectText:find(
+			"steal",
+			1,
+			true
+		)
+
+end
+
+local function promptPosition(prompt)
+
+	if
+		not prompt
+		or not prompt.Parent
+	then
+
+		return nil
+
+	end
+
+	if prompt.Parent:IsA("Attachment") then
+		return prompt.Parent.WorldPosition
+	end
+
+	if prompt.Parent:IsA("BasePart") then
+		return prompt.Parent.Position
+	end
+
+	local model =
+		prompt.Parent:
+			FindFirstAncestorWhichIsA(
+				"Model"
+			)
+
+	if model then
+
+		local part =
+			model.PrimaryPart
+			or model:
+				FindFirstChildWhichIsA(
+					"BasePart",
+					true
+				)
+
+		if part then
+			return part.Position
+		end
+
+	end
+
+end
+
+local function promptDistance(prompt)
+
+	local root = getRoot()
+	local pos = promptPosition(prompt)
+
+	if not root or not pos then
+		return math.huge
+	end
+
+	return
+		(
+			root.Position
+			- pos
+		).Magnitude
+
+end
+
+local function getNearestPrompt()
+
+	local best
+	local bestDistance =
+		math.huge
+
+	for prompt in pairs(Prompts) do
+
+		if isStealPrompt(prompt) then
+
+			local distance =
+				promptDistance(prompt)
+
+			if
+				distance
+				<= (
+					prompt.MaxActivationDistance
+					+ 0.75
+				)
+				and distance < bestDistance
+			then
+
+				best = prompt
+				bestDistance = distance
+
+			end
+
+		end
+
+	end
+
+	return best
+
+end
+
+local function getPromptMoney(prompt)
+
+	local pos =
+		promptPosition(prompt)
+
+	if not pos then
+		return nil
+	end
+
+	local nearest =
+		math.huge
+
+	local money
+
+	for _, data in pairs(
+		MoneyTargets
+	) do
+
+		if
+			data.Part
+			and data.Part.Parent
+		then
+
+			local distance =
+				(
+					data.Part.Position
+					- pos
+				).Magnitude
+
+			if
+				distance < nearest
+				and distance <= 25
+			then
+
+				nearest = distance
+				money = data.Value
+
+			end
+
+		end
+
+	end
+
+	return money
+
+end
+
+local function getHighestPrompt()
+
+	local best
+	local bestMoney = -math.huge
+
+	for prompt in pairs(Prompts) do
+
+		if isStealPrompt(prompt) then
+
+			local distance =
+				promptDistance(prompt)
+
+			if
+				distance
+				<= (
+					prompt.MaxActivationDistance
+					+ 0.75
+				)
+			then
+
+				local money =
+					getPromptMoney(prompt)
+
+				if
+					money
+					and money > bestMoney
+				then
+
+					bestMoney = money
+					best = prompt
+
+				end
+
+			end
+
+		end
+
+	end
+
+	return best
+
+end
+
+local stealing = false
+
+local function holdPrompt(prompt)
+
+	if
+		stealing
+		or not prompt
+		or not prompt.Parent
+	then
+
+		return
+
+	end
+
+	stealing = true
+
+	pcall(function()
+
+		prompt:InputHoldBegin()
+
+		local hold =
+			math.max(
+				prompt.HoldDuration,
+				0.05
+			)
+
+		task.wait(hold + 0.05)
+
+		prompt:InputHoldEnd()
+
+	end)
+
+	stealing = false
+
+end
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		if not stealing then
+
+			if nearestEnabled then
+
+				local prompt =
+					getNearestPrompt()
+
+				if prompt then
+
+					task.spawn(
+						holdPrompt,
+						prompt
+					)
+
+				end
+
+			elseif highestEnabled then
+
+				local prompt =
+					getHighestPrompt()
+
+				if prompt then
+
+					task.spawn(
+						holdPrompt,
+						prompt
+					)
+
+				end
+
+			end
+
+		end
+
+		task.wait(0.04)
+
+	end
+
+end)
 
 --========================================================
 -- BUTTON REFRESH
@@ -6097,14 +3285,12 @@ local function refreshButtons()
 		nearestEnabled
 	)
 
-
 	updateToggle(
 		HighestButton,
 		HighestStroke,
 		"HIGHEST MONEY",
 		highestEnabled
 	)
-
 
 	updateToggle(
 		AutoKickButton,
@@ -6113,14 +3299,12 @@ local function refreshButtons()
 		autoKickEnabled
 	)
 
-
 	updateToggle(
 		AutoHopButton,
 		AutoHopStroke,
 		"AUTO HOP",
 		autoHopEnabled
 	)
-
 
 	updateToggle(
 		RadarCircleButton,
@@ -6129,7 +3313,6 @@ local function refreshButtons()
 		radarCircleEnabled
 	)
 
-
 	updateToggle(
 		PlayerHighlightButton,
 		PlayerHighlightStroke,
@@ -6137,14 +3320,12 @@ local function refreshButtons()
 		playerHighlightEnabled
 	)
 
-
 	updateToggle(
 		RadarMenuButton,
 		RadarMenuStroke,
 		"RADAR MENU",
 		RadarPanel.Visible
 	)
-
 
 	updateToggle(
 		BrainrotMenuButton,
@@ -6155,44 +3336,26 @@ local function refreshButtons()
 
 end
 
-
---========================================================
--- BUTTON ACTIONS
---========================================================
-
 NearestButton.MouseButton1Click:
 	Connect(function()
 
 		nearestEnabled =
 			not nearestEnabled
 
-
 		if nearestEnabled then
-
-			highestEnabled =
-				false
-
+			highestEnabled = false
 		end
-
 
 		Saved.NearestSteal =
 			nearestEnabled
 
-
 		Saved.HighestMoney =
 			highestEnabled
 
-
-		cancelCurrentHold()
-
-
 		refreshButtons()
-
-
 		saveSettings()
 
 	end)
-
 
 HighestButton.MouseButton1Click:
 	Connect(function()
@@ -6200,33 +3363,20 @@ HighestButton.MouseButton1Click:
 		highestEnabled =
 			not highestEnabled
 
-
 		if highestEnabled then
-
-			nearestEnabled =
-				false
-
+			nearestEnabled = false
 		end
-
 
 		Saved.HighestMoney =
 			highestEnabled
 
-
 		Saved.NearestSteal =
 			nearestEnabled
 
-
-		cancelCurrentHold()
-
-
 		refreshButtons()
-
-
 		saveSettings()
 
 	end)
-
 
 AutoKickButton.MouseButton1Click:
 	Connect(function()
@@ -6234,22 +3384,15 @@ AutoKickButton.MouseButton1Click:
 		autoKickEnabled =
 			not autoKickEnabled
 
-
-		kickTriggered =
-			false
-
+		kickTriggered = false
 
 		Saved.AutoKick =
 			autoKickEnabled
 
-
 		refreshButtons()
-
-
 		saveSettings()
 
 	end)
-
 
 AutoHopButton.MouseButton1Click:
 	Connect(function()
@@ -6257,33 +3400,23 @@ AutoHopButton.MouseButton1Click:
 		autoHopEnabled =
 			not autoHopEnabled
 
-
 		Saved.AutoHop =
 			autoHopEnabled
 
-
 		if autoHopEnabled then
 
-			-- Manual re-enable means leave THIS server,
-			-- even if it already has $20M+.
-			autoHopManuallyRestarted =
-				true
+			manualAutoHopRestart = true
 
 		else
 
-			autoHopManuallyRestarted =
-				false
+			manualAutoHopRestart = false
 
 		end
 
-
 		refreshButtons()
-
-
 		saveSettings()
 
 	end)
-
 
 RadarCircleButton.MouseButton1Click:
 	Connect(function()
@@ -6291,18 +3424,13 @@ RadarCircleButton.MouseButton1Click:
 		radarCircleEnabled =
 			not radarCircleEnabled
 
-
 		Saved.RadarCircle =
 			radarCircleEnabled
 
-
 		refreshButtons()
-
-
 		saveSettings()
 
 	end)
-
 
 PlayerHighlightButton.MouseButton1Click:
 	Connect(function()
@@ -6310,48 +3438,13 @@ PlayerHighlightButton.MouseButton1Click:
 		playerHighlightEnabled =
 			not playerHighlightEnabled
 
-
 		Saved.PlayerHighlight =
 			playerHighlightEnabled
 
-
-		if not playerHighlightEnabled then
-
-			for _, data in pairs(
-				PlayerESP
-			) do
-
-				if data.Highlight then
-
-					data.Highlight.Enabled =
-						false
-
-				end
-
-
-				if data.Name then
-
-					data.Name.TextColor3 =
-						Color3.new(
-							1,
-							1,
-							1
-						)
-
-				end
-
-			end
-
-		end
-
-
 		refreshButtons()
-
-
 		saveSettings()
 
 	end)
-
 
 RadarMenuButton.MouseButton1Click:
 	Connect(function()
@@ -6359,24 +3452,13 @@ RadarMenuButton.MouseButton1Click:
 		RadarPanel.Visible =
 			not RadarPanel.Visible
 
-
 		Saved.RadarMenuOpen =
 			RadarPanel.Visible
 
-
-		Saved.RadarMenuPosition =
-			positionToTable(
-				RadarPanel.Position
-			)
-
-
 		refreshButtons()
-
-
 		saveSettings()
 
 	end)
-
 
 BrainrotMenuButton.MouseButton1Click:
 	Connect(function()
@@ -6384,137 +3466,190 @@ BrainrotMenuButton.MouseButton1Click:
 		BrainrotPanel.Visible =
 			not BrainrotPanel.Visible
 
-
 		Saved.BrainrotMenuOpen =
 			BrainrotPanel.Visible
 
-
-		Saved.BrainrotMenuPosition =
-			positionToTable(
-				BrainrotPanel.Position
-			)
-
-
 		refreshButtons()
-
-
 		saveSettings()
 
 	end)
 
-
 RadarClose.MouseButton1Click:
 	Connect(function()
 
-		task.defer(
-			refreshButtons
-		)
+		task.defer(refreshButtons)
 
 	end)
-
 
 BrainrotClose.MouseButton1Click:
 	Connect(function()
 
-		task.defer(
-			refreshButtons
-		)
+		task.defer(refreshButtons)
 
 	end)
 
-
 --========================================================
--- HTTP
+-- FIXED SERVER HOP
 --========================================================
 
-local function executorGet(
-	url
-)
+local recentServers = {}
+local recentOrder = {}
 
-	local ok,
-		body =
-		pcall(function()
-
-			return
-				game:
-					HttpGet(
-						url
-					)
-
-		end)
-
+for _, id in ipairs(
+	Saved.RecentServers or {}
+) do
 
 	if
-		ok
-		and body
+		type(id) == "string"
+		and id ~= ""
+		and id ~= game.JobId
 	then
 
-		return body
+		recentServers[id] = true
+
+		table.insert(
+			recentOrder,
+			id
+		)
 
 	end
 
+end
 
-	local requestFunction =
-		request
+local function saveRecent()
 
-		or http_request
+	Saved.RecentServers =
+		recentOrder
 
-		or (
-			syn
-			and syn.request
-		)
+	saveSettings()
 
+end
+
+local function addRecent(id)
 
 	if
-		type(
-			requestFunction
-		)
-		== "function"
+		not id
+		or id == ""
+		or id == game.JobId
+		or recentServers[id]
 	then
 
-		local requestOK,
-			response =
-			pcall(function()
+		return
 
-				return requestFunction({
+	end
 
-					Url =
-						url,
+	recentServers[id] = true
 
-					Method =
-						"GET"
+	table.insert(
+		recentOrder,
+		id
+	)
 
-				})
+	while
+		#recentOrder
+		> MAX_RECENT_SERVERS
+	do
 
-			end)
+		local removed =
+			table.remove(
+				recentOrder,
+				1
+			)
 
+		recentServers[removed] = nil
 
-		if
-			requestOK
+	end
 
-			and response
+	saveRecent()
 
-			and response.Body
-		then
+end
 
-			return
-				response.Body
+local function removeRecent(id)
+
+	if not id then
+		return
+	end
+
+	recentServers[id] = nil
+
+	for i = #recentOrder, 1, -1 do
+
+		if recentOrder[i] == id then
+
+			table.remove(
+				recentOrder,
+				i
+			)
 
 		end
 
 	end
 
+	saveRecent()
+
+end
+
+local function clearRecentHistory()
+
+	recentServers = {}
+	recentOrder = {}
+
+	saveRecent()
+
+end
+
+local function httpGet(url)
+
+	local success,
+		result =
+		pcall(function()
+
+			return game:HttpGet(url)
+
+		end)
+
+	if success and result then
+		return result
+	end
+
+	local requestFunction =
+		request
+		or http_request
+		or (
+			syn
+			and syn.request
+		)
+
+	if type(requestFunction) == "function" then
+
+		local ok,
+			response =
+			pcall(function()
+
+				return requestFunction({
+					Url = url,
+					Method = "GET"
+				})
+
+			end)
+
+		if
+			ok
+			and response
+			and response.Body
+		then
+
+			return response.Body
+
+		end
+
+	end
 
 	return nil
 
 end
 
-
---========================================================
--- SERVER PAGE
---========================================================
-
-local function getServerPage(
+local function fetchPage(
 	cursor,
 	order
 )
@@ -6525,34 +3660,27 @@ local function getServerPage(
 			TARGET_PLACE_ID
 		)
 		.. "/servers/Public?sortOrder="
+		.. order
+		.. "&limit="
 		.. tostring(
-			order
+			SERVER_PAGE_LIMIT
 		)
-		.. "&limit=100"
-
 
 	if cursor then
 
 		url ..=
 			"&cursor="
 			.. HttpService:
-				UrlEncode(
-					cursor
-				)
+				UrlEncode(cursor)
 
 	end
 
+	local body =
+		httpGet(url)
 
-	local raw =
-		executorGet(
-			url
-		)
-
-
-	if not raw then
+	if not body then
 		return nil
 	end
-
 
 	local ok,
 		data =
@@ -6560,191 +3688,82 @@ local function getServerPage(
 
 			return
 				HttpService:
-					JSONDecode(
-						raw
-					)
+					JSONDecode(body)
 
 		end)
-
 
 	if not ok then
 		return nil
 	end
 
-
 	return data
 
 end
 
+local failedServers = {}
 
---========================================================
--- SERVER HOP
---========================================================
+local function collectServers(
+	ignoreRecent
+)
 
-local hopping =
-	false
-
-
-local failedServers =
-	{}
-
-
-local pendingServer =
-	nil
-
-
-local function rotateOldServers()
-
-	if #recentOrder <= 1 then
-		return
-	end
-
-
-	local count =
-		math.max(
-			1,
-			math.floor(
-				#recentOrder
-				/ 2
-			)
-		)
-
-
-	for _ = 1, count do
-
-		local removed =
-			table.remove(
-				recentOrder,
-				1
-			)
-
-
-		if removed then
-
-			recentServers[
-				removed
-			] =
-				nil
-
-		end
-
-	end
-
-
-	-- Current server must remain excluded.
-	rememberServer(
-		game.JobId
-	)
-
-
-	saveRecentServers()
-
-end
-
-
-local function findFreshServer()
-
-	local started =
-		os.clock()
-
-
-	local candidates =
-		{}
-
-
-	local seen =
-		{}
-
+	local list = {}
+	local seen = {}
 
 	for _, order in ipairs({
 		"Asc",
 		"Desc"
 	}) do
 
-		local cursor =
-			nil
+		local cursor
 
-
-		for _ = 1, SERVER_SEARCH_PAGES do
-
-			if
-				os.clock()
-				- started
-				>= SERVER_SEARCH_TIMEOUT
-			then
-
-				break
-
-			end
-
+		for _ = 1, SERVER_PAGES_PER_SEARCH do
 
 			local page =
-				getServerPage(
+				fetchPage(
 					cursor,
 					order
 				)
-
 
 			if not page then
 				break
 			end
 
-
 			for _, server in ipairs(
-				page.data
-				or {}
+				page.data or {}
 			) do
 
 				local id =
 					server.id
-
 
 				local playing =
 					tonumber(
 						server.playing
 					)
 
-
 				local maxPlayers =
 					tonumber(
 						server.maxPlayers
 					)
 
-
 				if
 					id
-
 					and id ~= ""
-
 					and id ~= game.JobId
-
-					and not seen[
-						id
-					]
-
-					and not recentServers[
-						id
-					]
-
-					and not failedServers[
-						id
-					]
-
+					and not seen[id]
+					and not failedServers[id]
+					and (
+						ignoreRecent
+						or not recentServers[id]
+					)
 					and playing
-
 					and maxPlayers
-
 					and playing < maxPlayers
 				then
 
-					seen[
-						id
-					] =
-						true
-
+					seen[id] = true
 
 					table.insert(
-						candidates,
+						list,
 						server
 					)
 
@@ -6752,17 +3771,14 @@ local function findFreshServer()
 
 			end
 
-
 			cursor =
 				page.nextPageCursor
-
 
 			if not cursor then
 				break
 			end
 
-
-			if #candidates >= 100 then
+			if #list >= 100 then
 				break
 			end
 
@@ -6770,68 +3786,74 @@ local function findFreshServer()
 
 	end
 
-
-	if #candidates == 0 then
-		return nil
-	end
-
-
-	return
-		candidates[
-			RNG:
-				NextInteger(
-					1,
-					#candidates
-				)
-		]
+	return list
 
 end
 
+local function chooseServer()
 
-pcall(function()
+	-- First try servers we haven't recently used.
 
-	TeleportService.TeleportInitFailed:
-		Connect(function(
-			player
-		)
+	local servers =
+		collectServers(false)
 
-			if player ~= LP then
-				return
-			end
+	if #servers > 0 then
 
+		return
+			servers[
+				RNG:NextInteger(
+					1,
+					#servers
+				)
+			]
 
-			if pendingServer then
+	end
 
-				failedServers[
-					pendingServer
-				] =
-					true
+	-- IMPORTANT FIX:
+	--
+	-- If recent history filtered everything,
+	-- clear the old history and search again.
+	--
+	-- CURRENT SERVER IS STILL EXCLUDED because
+	-- collectServers checks id ~= game.JobId.
 
-			end
+	clearRecentHistory()
 
+	servers =
+		collectServers(true)
 
-			pendingServer =
-				nil
+	if #servers > 0 then
 
-	end)
+		return
+			servers[
+				RNG:NextInteger(
+					1,
+					#servers
+				)
+			]
 
-end)
+	end
 
+	return nil
+
+end
+
+local hopping = false
+
+local function resetHopButton()
+
+	HopButton.Text = "HOP"
+	HopButton.TextSize = 24
+
+end
 
 local function serverHop()
 
 	if hopping then
-		return false
+		return
 	end
 
-
-	hopping =
-		true
-
-
-	local startingJob =
-		game.JobId
-
+	hopping = true
 
 	task.spawn(function()
 
@@ -6843,80 +3865,55 @@ local function serverHop()
 			HopButton.Text =
 				"FINDING..."
 
-
 			HopButton.TextSize =
 				14
 
-
 			local target =
-				findFreshServer()
-
+				chooseServer()
 
 			if not target then
 
-				-- We found no NEW server among the
-				-- recent blacklist. Rotate oldest entries
-				-- instead of sitting on REFRESHING forever.
+				-- API gave us nothing at all.
+				-- Do another clean request shortly.
 
 				HopButton.Text =
-					"RETRYING..."
+					"SEARCHING..."
 
-
-				rotateOldServers()
-
-
-				task.wait(
-					NO_SERVER_RETRY
-				)
-
+				task.wait(0.35)
 
 				continue
 
 			end
 
-
-			local serverId =
+			local id =
 				target.id
 
+			-- HARD CHECK:
+			-- NEVER TELEPORT TO CURRENT JOB ID
 
 			if
-				not serverId
-
-				or serverId == ""
-
-				or serverId == game.JobId
-
-				or recentServers[
-					serverId
-				]
-
-				or failedServers[
-					serverId
-				]
+				not id
+				or id == ""
+				or id == game.JobId
 			then
 
 				task.wait()
-
 				continue
 
 			end
-
-
-			-- Save target immediately.
-			rememberServer(
-				serverId
-			)
-
-
-			pendingServer =
-				serverId
-
 
 			HopButton.Text =
 				"HOPPING..."
 
+			local originalJob =
+				game.JobId
 
-			local teleportStarted =
+			-- Temporarily save this target so the next
+			-- instance knows where we just went.
+
+			addRecent(id)
+
+			local started =
 				pcall(function()
 
 					TeleportService:
@@ -6924,7 +3921,7 @@ local function serverHop()
 
 							TARGET_PLACE_ID,
 
-							serverId,
+							id,
 
 							LP
 
@@ -6932,82 +3929,65 @@ local function serverHop()
 
 				end)
 
+			if not started then
 
-			if not teleportStarted then
+				-- Critical fix:
+				-- failed teleport is NOT considered visited
 
-				failedServers[
-					serverId
-				] =
+				removeRecent(id)
+
+				failedServers[id] =
 					true
-
-
-				pendingServer =
-					nil
-
 
 				HopButton.Text =
 					"RETRYING..."
-
 
 				task.wait(
 					HOP_RETRY_DELAY
 				)
 
-
 				continue
 
 			end
 
-
-			local watchdogStarted =
+			local watchdog =
 				os.clock()
-
 
 			while
 				Gui.Parent
-
 				and hopping
-
-				and os.clock()
-					- watchdogStarted
-					< TELEPORT_WATCHDOG
+				and os.clock() - watchdog
+					< HOP_WATCHDOG
 			do
 
 				if
 					game.JobId
-					~= startingJob
+					~= originalJob
 				then
 
 					return
 
 				end
 
-
-				task.wait(
-					0.05
-				)
+				task.wait(0.05)
 
 			end
 
+			-- Teleport call succeeded but Roblox
+			-- left us in the same server.
 
 			if
 				game.JobId
-				== startingJob
+				== originalJob
 			then
 
-				failedServers[
-					serverId
-				] =
+				removeRecent(id)
+
+				failedServers[id] =
 					true
-
-
-				pendingServer =
-					nil
-
 
 				HopButton.Text =
 					"RETRYING..."
-
 
 				task.wait(
 					HOP_RETRY_DELAY
@@ -7021,33 +4001,32 @@ local function serverHop()
 
 		end
 
-
-		hopping =
-			false
-
-
-		HopButton.Text =
-			"HOP"
-
-
-		HopButton.TextSize =
-			24
+		hopping = false
+		resetHopButton()
 
 	end)
-
-
-	return true
 
 end
 
+-- Roblox teleport failure event
+
+pcall(function()
+
+	TeleportService.TeleportInitFailed:
+		Connect(function(player)
+
+			if player ~= LP then
+				return
+			end
+
+			-- Watchdog handles retry automatically.
+
+		end)
+
+end)
 
 HopButton.MouseButton1Click:
-	Connect(function()
-
-		serverHop()
-
-	end)
-
+	Connect(serverHop)
 
 UserInputService.InputBegan:
 	Connect(function(
@@ -7059,10 +4038,9 @@ UserInputService.InputBegan:
 			return
 		end
 
-
 		if
 			input.KeyCode
-			== Enum.KeyCode.Z
+				== Enum.KeyCode.Z
 		then
 
 			serverHop()
@@ -7071,17 +4049,14 @@ UserInputService.InputBegan:
 
 	end)
 
-
 --========================================================
--- WAIT FOR SERVER DATA
+-- AUTO HOP
 --========================================================
 
-local function waitForServerData()
+local function waitInitialSecond()
 
 	local elapsed =
-		os.clock()
-		- SERVER_JOINED_AT
-
+		os.clock() - JOIN_TIME
 
 	if elapsed < AUTO_HOP_JOIN_WAIT then
 
@@ -7092,107 +4067,46 @@ local function waitForServerData()
 
 	end
 
-
-	local started =
-		os.clock()
-
-
-	while Gui.Parent do
-
-		scanMoney()
-
-
-		if next(
-			MoneyTargets
-		)
-			~= nil
-		then
-
-			return true
-
-		end
-
-
-		if
-			os.clock()
-			- started
-			>= DATA_READY_TIMEOUT
-		then
-
-			return false
-
-		end
-
-
-		task.wait(
-			0.1
-		)
-
-	end
-
-
-	return false
-
 end
-
-
---========================================================
--- AUTO HOP LOOP
---========================================================
 
 task.spawn(function()
 
-	-- Auto Hop carried from another server:
-	-- wait for actual server data first.
-
-	if autoHopEnabled then
-
-		waitForServerData()
-
-	end
-
+	waitInitialSecond()
 
 	while Gui.Parent do
 
 		if autoHopEnabled then
 
+			-- Fast refresh before making the decision.
 			scanMoney()
-
 
 			local found,
 				data =
 				hasGoodBrainrot()
 
-
 			if
 				found
-
-				and not autoHopManuallyRestarted
+				and not manualAutoHopRestart
 			then
 
-				autoHopEnabled =
-					false
+				autoHopEnabled = false
 
-
-				Saved.AutoHop =
-					false
-
+				Saved.AutoHop = false
 
 				refreshButtons()
-
-
 				saveSettings()
 
-
 				print(
-					"[FTX] AUTO HOP STOPPED - FOUND:",
+					"[FTX] AUTO HOP OFF - FOUND:",
 					data
 					and data.Text
 					or "$20M+/s"
 				)
 
-
 			elseif not hopping then
+
+				-- If YOU manually turn Auto Hop back ON
+				-- in a good server, leave it anyway.
 
 				serverHop()
 
@@ -7200,120 +4114,86 @@ task.spawn(function()
 
 		end
 
-
-		task.wait(
-			AUTO_HOP_LOOP_RATE
-		)
+		task.wait(0.15)
 
 	end
 
 end)
 
-
 --========================================================
--- KEEP BRAINROT BEAMS ATTACHED
+-- KEEP LINES ATTACHED AFTER RESPAWN
 --========================================================
 
 task.spawn(function()
 
 	while Gui.Parent do
 
-		local attachment =
+		local rootAttachment =
 			getRootAttachment()
 
+		if rootAttachment then
 
-		for label,
-			data in pairs(
+			for label, data in pairs(
 				BrainrotESP
-			)
-		do
+			) do
 
-			if
-				not label.Parent
+				if
+					not label.Parent
+					or not data.Beam
+				then
 
-				or not data.Beam
-			then
+					removeESP(label)
 
-				removeBrainrotESP(
-					label
-				)
+				else
 
-			elseif attachment then
+					data.Beam.Attachment0 =
+						rootAttachment
 
-				data.Beam.Attachment0 =
-					attachment
+				end
+
+			end
+
+			if SelectedBeam then
+
+				SelectedBeam.Attachment0 =
+					rootAttachment
 
 			end
 
 		end
 
-
-		if
-			SelectedBeam
-
-			and attachment
-		then
-
-			SelectedBeam.Attachment0 =
-				attachment
-
-		end
-
-
-		task.wait(
-			0.25
-		)
+		task.wait(0.25)
 
 	end
 
 end)
 
-
 --========================================================
 -- MOBILE
 --========================================================
 
-local function setupMobile()
-
-	if not UserInputService.TouchEnabled then
-		return
-	end
-
+if UserInputService.TouchEnabled then
 
 	addScale(
 		MainMenu,
-		"FTXMobileScale",
 		MOBILE_MENU_SCALE
 	)
-
 
 	addScale(
 		RadarPanel,
-		"FTXMobileScale",
 		MOBILE_MENU_SCALE
 	)
-
 
 	addScale(
 		BrainrotPanel,
-		"FTXMobileScale",
 		MOBILE_MENU_SCALE
 	)
-
-
-	addScale(
-		Progress,
-		"FTXMobileScale",
-		MOBILE_MENU_SCALE
-	)
-
 
 	HopHolder.AnchorPoint =
 		Vector2.new(
 			0.5,
 			0
 		)
-
 
 	HopHolder.Position =
 		UDim2.new(
@@ -7323,20 +4203,7 @@ local function setupMobile()
 			26
 		)
 
-
-	MainOpen.Position =
-		UDim2.new(
-			0,
-			8,
-			0.5,
-			0
-		)
-
 end
-
-
-setupMobile()
-
 
 --========================================================
 -- RESPAWN
@@ -7345,14 +4212,9 @@ setupMobile()
 LP.CharacterAdded:
 	Connect(function()
 
-		RootAttachment =
-			nil
-
-
-		cancelCurrentHold()
+		RootAttachment = nil
 
 	end)
-
 
 --========================================================
 -- SAVE LOOP
@@ -7362,68 +4224,49 @@ task.spawn(function()
 
 	while Gui.Parent do
 
-		task.wait(
-			2
-		)
-
+		task.wait(2)
 
 		Saved.MainMenuPosition =
-			positionToTable(
+			savePos(
 				MainMenu.Position
 			)
 
-
 		Saved.RadarMenuPosition =
-			positionToTable(
+			savePos(
 				RadarPanel.Position
 			)
 
-
 		Saved.BrainrotMenuPosition =
-			positionToTable(
+			savePos(
 				BrainrotPanel.Position
 			)
-
 
 		Saved.MainMenuOpen =
 			MainMenu.Visible
 
-
 		Saved.RadarMenuOpen =
 			RadarPanel.Visible
-
 
 		Saved.BrainrotMenuOpen =
 			BrainrotPanel.Visible
 
-
 		Saved.NearestSteal =
 			nearestEnabled
-
 
 		Saved.HighestMoney =
 			highestEnabled
 
-
 		Saved.AutoKick =
 			autoKickEnabled
-
 
 		Saved.AutoHop =
 			autoHopEnabled
 
-
 		Saved.RadarCircle =
 			radarCircleEnabled
 
-
 		Saved.PlayerHighlight =
 			playerHighlightEnabled
-
-
-		Saved.RecentServers =
-			recentOrder
-
 
 		saveSettings()
 
@@ -7431,54 +4274,16 @@ task.spawn(function()
 
 end)
 
-
 --========================================================
--- INITIAL UI
+-- START
 --========================================================
 
 refreshButtons()
 
-
---========================================================
--- DONE
---========================================================
-
-print(
-	"[FTX] FULL SCRIPT LOADED"
-)
-
-
-print(
-	"[FTX] AUTO HOP WAIT =",
-	AUTO_HOP_JOIN_WAIT
-)
-
-
-print(
-	"[FTX] DATA READY TIMEOUT =",
-	DATA_READY_TIMEOUT
-)
-
-
-print(
-	"[FTX] CURRENT SERVER =",
-	game.JobId
-)
-
-
-print(
-	"[FTX] RECENT SERVERS =",
-	#recentOrder
-)
-
-
-print(
-	"[FTX] $20M SOUND =",
-	GOOD_SOUND_ID
-)
-
-
-print(
-	"[FTX] SETTINGS SAVE =",
-	canSave
-)
+print("[FTX] LOADED")
+print("[FTX] AUTO HOP WAIT = 1 SECOND")
+print("[FTX] CURRENT SERVER =", game.JobId)
+print("[FTX] HOPPER CURRENT-JOB PROTECTION = ON")
+print("[FTX] FAILED TARGET RETRY = ON")
+print("[FTX] $20M SOUND =", GOOD_SOUND_ID)
+print("[FTX] SETTINGS SAVE =", canSave)

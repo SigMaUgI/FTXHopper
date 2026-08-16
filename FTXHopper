@@ -1,38 +1,63 @@
 --========================================================
 -- FTX ALL-IN-ONE
 --
--- UPDATED:
--- • Auto Hop waits 1 SECOND after joining
--- • NEVER intentionally rejoins a previously visited JobId
--- • Visited server JobIds save across teleports/rejoins
--- • Current server is automatically blacklisted
--- • No random Teleport() fallback that could send you back
--- • Failed server = skipped
--- • Full server = skipped
--- • Current server = skipped
--- • Previously visited server = skipped
--- • If server pool gives nothing, refreshes and searches again
+-- FULL VERSION
+--
+-- MAIN FEATURES:
+-- • Standalone HOP button
+-- • Z = server hop
+-- • Main controls menu
+-- • Main menu draggable
+-- • Main menu closable / reopenable
+-- • Radar menu draggable
+-- • Radar menu closable / reopenable
+-- • Brainrot menu draggable
+-- • Brainrot menu closable / reopenable
+--
+-- SAVED:
+-- • Toggle states
+-- • Menu positions
+-- • Menu open/closed states
+-- • Recent server JobIds
 --
 -- AUTO HOP:
--- • Carries ON into next server
--- • Waits 1 second
--- • $20M/s+ found -> turns OFF
--- • Nothing good -> hops again
--- • Manually turning Auto Hop back ON forces another hop
+-- • Waits minimum 1 second after joining
+-- • Waits for world/money UI to actually begin loading
+-- • Finds $20M/sec+
+-- • Stops Auto Hop when $20M/sec+ found
+-- • Manual re-enable forces another hop
+-- • Avoids current server
+-- • Avoids recently used servers
+-- • Avoids full servers
+-- • Failed hops automatically retry
+-- • Recent list rotates so it cannot remain stuck forever
 --
 -- SOUND:
--- • $20M/s+ appearance sound:
---   103185549195508
+-- • Plays 103185549195508 when a NEW $20M/sec+
+--   target appears
+--
+-- PHONE:
+-- • Menus 50%
+-- • HOP top middle
+--
+-- PC:
+-- • Menus full size
+-- • HOP bottom right
 --========================================================
 
 
 --========================================================
--- SERVICES
+-- LOAD
 --========================================================
 
 if not game:IsLoaded() then
 	game.Loaded:Wait()
 end
+
+
+--========================================================
+-- SERVICES
+--========================================================
 
 local Players =
 	game:GetService("Players")
@@ -55,19 +80,22 @@ local UserInputService =
 local ProximityPromptService =
 	game:GetService("ProximityPromptService")
 
-local CoreGui =
-	game:GetService("CoreGui")
-
 local SoundService =
 	game:GetService("SoundService")
+
+local CoreGui =
+	game:GetService("CoreGui")
 
 
 local LP =
 	Players.LocalPlayer
 
+
 while not LP do
 	task.wait()
-	LP = Players.LocalPlayer
+
+	LP =
+		Players.LocalPlayer
 end
 
 
@@ -76,15 +104,14 @@ local PlayerGui =
 		"PlayerGui"
 	)
 
-while not PlayerGui do
 
+while not PlayerGui do
 	task.wait()
 
 	PlayerGui =
 		LP:FindFirstChildOfClass(
 			"PlayerGui"
 		)
-
 end
 
 
@@ -97,7 +124,7 @@ local SERVER_JOINED_AT =
 
 
 --========================================================
--- SETTINGS
+-- CONFIG
 --========================================================
 
 local TARGET_PLACE_ID =
@@ -153,45 +180,71 @@ local RESET_FALLBACK =
 
 
 --========================================================
--- AUTO HOP JOIN WAIT
---
--- CHANGED FROM 2 -> 1
+-- AUTO HOP
 --========================================================
 
 local AUTO_HOP_JOIN_WAIT =
 	1
 
 
+local DATA_READY_TIMEOUT =
+	12
+
+
 local AUTO_HOP_LOOP_RATE =
 	0.15
 
 
-local HOP_WATCHDOG_TIME =
-	2.25
+local MAX_RECENT_SERVERS =
+	150
+
+
+local SERVER_SEARCH_PAGES =
+	12
+
+
+local SERVER_SEARCH_TIMEOUT =
+	4
+
+
+local TELEPORT_WATCHDOG =
+	3
 
 
 local HOP_RETRY_DELAY =
-	0.15
+	0.12
 
 
 local NO_SERVER_RETRY =
-	0.25
+	0.15
 
+
+--========================================================
+-- MOBILE
+--========================================================
 
 local MOBILE_MENU_SCALE =
 	0.5
 
 
+--========================================================
+-- SAVE
+--========================================================
+
 local SAVE_FILE =
 	"FTX_AllInOne_Settings.json"
 
+
+--========================================================
+-- SOUND
+--========================================================
 
 local GOOD_SOUND_ID =
 	"rbxassetid://103185549195508"
 
 
 --========================================================
--- DEFAULT SAVE DATA
+-- DEFAULT SETTINGS
 --========================================================
 
 local Saved = {
@@ -225,15 +278,6 @@ local Saved = {
 		true,
 
 
-	--============================================
-	-- IMPORTANT:
-	-- JobIds stored here NEVER get selected again.
-	--============================================
-
-	VisitedServers =
-		{},
-
-
 	MainMenuPosition = {
 
 		XScale = 0,
@@ -264,25 +308,32 @@ local Saved = {
 		YScale = 0.5,
 		YOffset = 0
 
-	}
+	},
+
+
+	RecentServers =
+		{}
 
 }
 
 
 --========================================================
--- SAVE SYSTEM
+-- SAVE SUPPORT
 --========================================================
 
 local canSave =
 
-	typeof(writefile) == "function"
+	typeof(writefile)
+	== "function"
 
-	and typeof(readfile) == "function"
+	and typeof(readfile)
+	== "function"
 
-	and typeof(isfile) == "function"
+	and typeof(isfile)
+	== "function"
 
 
-local function mergeTable(
+local function mergeSettings(
 	target,
 	source
 )
@@ -297,13 +348,16 @@ local function mergeTable(
 	) do
 
 		if
-			type(value) == "table"
+			type(value)
+				== "table"
 
-			and type(target[key])
+			and type(
+				target[key]
+			)
 				== "table"
 		then
 
-			mergeTable(
+			mergeSettings(
 				target[key],
 				value
 			)
@@ -344,16 +398,16 @@ local function loadSettings()
 			)
 
 
-		local decoded =
+		local data =
 			HttpService:
 				JSONDecode(
 					raw
 				)
 
 
-		mergeTable(
+		mergeSettings(
 			Saved,
-			decoded
+			data
 		)
 
 	end)
@@ -389,97 +443,14 @@ end
 loadSettings()
 
 
-if
-	type(
-		Saved.VisitedServers
-	)
-	~= "table"
-then
+if type(
+	Saved.RecentServers
+) ~= "table" then
 
-	Saved.VisitedServers =
+	Saved.RecentServers =
 		{}
 
 end
-
-
---========================================================
--- VISITED SERVER SYSTEM
---========================================================
-
-local visitedServers =
-	{}
-
-
--- Saved format is:
---
--- Saved.VisitedServers = {
---     ["JOBID"] = true
--- }
---
--- Copy it locally.
-for jobId, value in pairs(
-	Saved.VisitedServers
-) do
-
-	if value then
-
-		visitedServers[
-			tostring(jobId)
-		] =
-			true
-
-	end
-
-end
-
-
-local function rememberVisitedServer(
-	jobId
-)
-
-	if
-		not jobId
-		or jobId == ""
-	then
-
-		return
-
-	end
-
-
-	jobId =
-		tostring(
-			jobId
-		)
-
-
-	visitedServers[
-		jobId
-	] =
-		true
-
-
-	Saved.VisitedServers[
-		jobId
-	] =
-		true
-
-
-	saveSettings()
-
-end
-
-
---========================================================
--- BLACKLIST THE SERVER WE ARE CURRENTLY INSIDE.
---
--- This is what prevents a later server search from
--- ever selecting this exact JobId again.
---========================================================
-
-rememberVisitedServer(
-	game.JobId
-)
 
 
 --========================================================
@@ -547,7 +518,148 @@ end
 
 
 --========================================================
--- CLEAN OLD GUI
+-- RECENT SERVER SYSTEM
+--========================================================
+
+local recentServers =
+	{}
+
+
+local recentOrder =
+	{}
+
+
+local function rebuildRecentServers()
+
+	recentServers =
+		{}
+
+
+	recentOrder =
+		{}
+
+
+	for _, id in ipairs(
+		Saved.RecentServers
+	) do
+
+		if
+			type(id) == "string"
+
+			and id ~= ""
+		then
+
+			if not recentServers[id] then
+
+				recentServers[id] =
+					true
+
+
+				table.insert(
+					recentOrder,
+					id
+				)
+
+			end
+
+		end
+
+	end
+
+end
+
+
+rebuildRecentServers()
+
+
+local function saveRecentServers()
+
+	Saved.RecentServers =
+		recentOrder
+
+
+	saveSettings()
+
+end
+
+
+local function rememberServer(
+	id
+)
+
+	if
+		not id
+		or id == ""
+	then
+
+		return
+
+	end
+
+
+	id =
+		tostring(
+			id
+		)
+
+
+	if recentServers[
+		id
+	] then
+
+		return
+
+	end
+
+
+	recentServers[
+		id
+	] =
+		true
+
+
+	table.insert(
+		recentOrder,
+		id
+	)
+
+
+	while
+		#recentOrder
+		> MAX_RECENT_SERVERS
+	do
+
+		local removed =
+			table.remove(
+				recentOrder,
+				1
+			)
+
+
+		if removed then
+
+			recentServers[
+				removed
+			] =
+				nil
+
+		end
+
+	end
+
+
+	saveRecentServers()
+
+end
+
+
+rememberServer(
+	game.JobId
+)
+
+
+--========================================================
+-- CLEAN OLD
 --========================================================
 
 pcall(function()
@@ -557,6 +669,7 @@ pcall(function()
 			FindFirstChild(
 				"FTX_AllInOne"
 			)
+
 
 	if old then
 		old:Destroy()
@@ -573,6 +686,7 @@ pcall(function()
 				"FTX_WORLD"
 			)
 
+
 	if old then
 		old:Destroy()
 	end
@@ -581,7 +695,7 @@ end)
 
 
 --========================================================
--- GUI
+-- GUI ROOT
 --========================================================
 
 local Gui =
@@ -639,7 +753,7 @@ local GoodSound =
 	)
 
 GoodSound.Name =
-	"FTX_20M_SOUND"
+	"FTX_GOOD_SOUND"
 
 GoodSound.SoundId =
 	GOOD_SOUND_ID
@@ -660,7 +774,7 @@ local function playGoodSound()
 	if
 		os.clock()
 		- lastSoundTime
-		< 0.20
+		< 0.25
 	then
 
 		return
@@ -676,6 +790,7 @@ local function playGoodSound()
 
 		GoodSound.TimePosition =
 			0
+
 
 		GoodSound:
 			Play()
@@ -694,22 +809,25 @@ local function corner(
 	radius
 )
 
-	local object =
+	local c =
 		Instance.new(
 			"UICorner"
 		)
 
-	object.CornerRadius =
+
+	c.CornerRadius =
 		UDim.new(
 			0,
-			radius or 12
+			radius
+			or 12
 		)
 
-	object.Parent =
+
+	c.Parent =
 		parent
 
 
-	return object
+	return c
 
 end
 
@@ -720,28 +838,31 @@ local function stroke(
 	color
 )
 
-	local object =
+	local s =
 		Instance.new(
 			"UIStroke"
 		)
 
-	object.Thickness =
-		thickness or 2
 
-	object.Color =
+	s.Thickness =
+		thickness
+		or 2
+
+
+	s.Color =
 		color
-
 		or Color3.fromRGB(
 			90,
 			90,
 			95
 		)
 
-	object.Parent =
+
+	s.Parent =
 		parent
 
 
-	return object
+	return s
 
 end
 
@@ -764,28 +885,31 @@ local function addScale(
 	end
 
 
-	local objectScale =
+	local s =
 		Instance.new(
 			"UIScale"
 		)
 
-	objectScale.Name =
+
+	s.Name =
 		name
 
-	objectScale.Scale =
+
+	s.Scale =
 		value
 
-	objectScale.Parent =
+
+	s.Parent =
 		object
 
 
-	return objectScale
+	return s
 
 end
 
 
 --========================================================
--- DRAG SYSTEM
+-- DRAG
 --========================================================
 
 local function makeDraggable(
@@ -927,17 +1051,17 @@ local RootAttachment =
 
 local function getRoot()
 
-	local character =
+	local char =
 		LP.Character
 
 
-	if not character then
+	if not char then
 		return nil
 	end
 
 
 	return
-		character:
+		char:
 			FindFirstChild(
 				"HumanoidRootPart"
 			)
@@ -983,8 +1107,10 @@ local function getRootAttachment()
 				"Attachment"
 			)
 
+
 		RootAttachment.Name =
 			"FTX_ROOT"
+
 
 		RootAttachment.Parent =
 			root
@@ -992,8 +1118,7 @@ local function getRootAttachment()
 	end
 
 
-	return
-		RootAttachment
+	return RootAttachment
 
 end
 
@@ -1035,9 +1160,6 @@ HopHolder.BackgroundColor3 =
 		13,
 		17
 	)
-
-HopHolder.BackgroundTransparency =
-	0.03
 
 HopHolder.BorderSizePixel =
 	0
@@ -1109,7 +1231,7 @@ HopGradient.Color =
 
 			Color3.fromRGB(
 				255,
-				95,
+				90,
 				0
 			)
 		),
@@ -1120,7 +1242,7 @@ HopGradient.Color =
 			Color3.fromRGB(
 				255,
 				240,
-				55
+				50
 			)
 		),
 
@@ -1129,7 +1251,7 @@ HopGradient.Color =
 
 			Color3.fromRGB(
 				255,
-				125,
+				120,
 				0
 			)
 		)
@@ -1500,7 +1622,7 @@ MainOpen.MouseButton1Click:
 
 
 --========================================================
--- CONTROLS
+-- CONTROL LIST
 --========================================================
 
 local ControlsList =
@@ -1610,7 +1732,7 @@ local function createMenuButton(
 	)
 
 
-	local buttonStroke =
+	local s =
 		stroke(
 			button,
 			1.5,
@@ -1624,7 +1746,7 @@ local function createMenuButton(
 
 	return
 		button,
-		buttonStroke
+		s
 
 end
 
@@ -1738,7 +1860,7 @@ local autoHopManuallyRestarted =
 
 
 --========================================================
--- TOGGLE VISUAL
+-- TOGGLE VISUALS
 --========================================================
 
 local function updateToggle(
@@ -1806,7 +1928,7 @@ end
 
 
 --========================================================
--- MONEY
+-- MONEY PARSER
 --========================================================
 
 local function parseMoney(
@@ -1869,30 +1991,30 @@ local function parseMoney(
 	end
 
 
-	local multiplier =
+	local mult =
 		1
 
 
 	if suffix == "K" then
-		multiplier = 1e3
+		mult = 1e3
 
 	elseif suffix == "M" then
-		multiplier = 1e6
+		mult = 1e6
 
 	elseif suffix == "B" then
-		multiplier = 1e9
+		mult = 1e9
 
 	elseif suffix == "T" then
-		multiplier = 1e12
+		mult = 1e12
 
 	elseif suffix == "Q" then
-		multiplier = 1e15
+		mult = 1e15
 	end
 
 
 	return
 		number
-		* multiplier
+		* mult
 
 end
 
@@ -1990,8 +2112,7 @@ local function getWorldPart(
 					)
 				then
 
-					return
-						adornee
+					return adornee
 
 				end
 
@@ -2233,6 +2354,7 @@ local function findBrainrotName(
 					bestScore =
 						score
 
+
 					best =
 						text
 
@@ -2296,6 +2418,7 @@ local function hasGoodBrainrot()
 				>= MIN_MONEY
 
 			and data.Part
+
 			and data.Part.Parent
 		then
 
@@ -2669,18 +2792,18 @@ local function checkMoney(
 	end
 
 
-	local previous =
+	local oldData =
 		MoneyTargets[
 			object
 		]
 
 
-	local previousGood =
-		previous
+	local wasGood =
+		oldData
 
-		and previous.Value
+		and oldData.Value
 
-		and previous.Value
+		and oldData.Value
 			>= MIN_MONEY
 
 
@@ -2755,7 +2878,7 @@ local function checkMoney(
 	if value >= MIN_MONEY then
 
 		if
-			not previousGood
+			not wasGood
 
 			and not AnnouncedGoodTargets[
 				object
@@ -2901,6 +3024,7 @@ local function scanMoney()
 end
 
 
+-- Run immediately instead of waiting for timer.
 task.spawn(
 	scanMoney
 )
@@ -2929,7 +3053,7 @@ end)
 
 
 --========================================================
--- BRAINROT PANEL
+-- BRAINROT MENU
 --========================================================
 
 local BrainrotPanel =
@@ -3179,6 +3303,12 @@ BrainrotClose.MouseButton1Click:
 
 		Saved.BrainrotMenuOpen =
 			false
+
+
+		Saved.BrainrotMenuPosition =
+			positionToTable(
+				BrainrotPanel.Position
+			)
 
 
 		saveSettings()
@@ -3460,7 +3590,7 @@ end)
 
 
 --========================================================
--- PROGRESS BAR
+-- PROGRESS UI
 --========================================================
 
 local Progress =
@@ -3701,8 +3831,95 @@ corner(
 )
 
 
+local FillGradient =
+	Instance.new(
+		"UIGradient"
+	)
+
+FillGradient.Color =
+	ColorSequence.new({
+
+		ColorSequenceKeypoint.new(
+			0,
+
+			Color3.fromRGB(
+				255,
+				90,
+				0
+			)
+		),
+
+		ColorSequenceKeypoint.new(
+			0.5,
+
+			Color3.fromRGB(
+				255,
+				230,
+				30
+			)
+		),
+
+		ColorSequenceKeypoint.new(
+			1,
+
+			Color3.fromRGB(
+				255,
+				120,
+				0
+			)
+		)
+
+	})
+
+FillGradient.Parent =
+	ProgressFill
+
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		FillGradient.Offset =
+			Vector2.new(
+				-1,
+				0
+			)
+
+
+		local tween =
+			TweenService:
+				Create(
+
+					FillGradient,
+
+					TweenInfo.new(
+						1,
+						Enum.EasingStyle.Linear
+					),
+
+					{
+						Offset =
+							Vector2.new(
+								1,
+								0
+							)
+					}
+
+				)
+
+
+		tween:Play()
+
+		tween.Completed:
+			Wait()
+
+	end
+
+end)
+
+
 --========================================================
--- PROMPTS
+-- PROMPT SYSTEM
 --========================================================
 
 local Prompts =
@@ -3802,6 +4019,29 @@ workspace.DescendantAdded:
 	Connect(
 		addPrompt
 	)
+
+
+workspace.DescendantRemoving:
+	Connect(function(object)
+
+		Prompts[
+			object
+		] =
+			nil
+
+
+		VisiblePrompts[
+			object
+		] =
+			nil
+
+
+		PromptBlocked[
+			object
+		] =
+			nil
+
+	end)
 
 
 ProximityPromptService.PromptShown:
@@ -4024,10 +4264,7 @@ local function getNearestSteal()
 					).Magnitude
 
 
-				if
-					distance
-					< bestDistance
-				then
+				if distance < bestDistance then
 
 					bestDistance =
 						distance
@@ -4090,8 +4327,7 @@ local function promptMoney(
 
 
 			if
-				distance
-					< bestDistance
+				distance < bestDistance
 
 				and distance <= 25
 			then
@@ -4141,9 +4377,7 @@ local function getHighestSteal()
 
 			if
 				money
-
-				and money
-					> bestMoney
+				and money > bestMoney
 			then
 
 				bestMoney =
@@ -4168,7 +4402,7 @@ end
 
 
 --========================================================
--- STEAL SYSTEM
+-- STEAL
 --========================================================
 
 local stealing =
@@ -4606,7 +4840,7 @@ end)
 
 
 --========================================================
--- RADAR PANEL
+-- RADAR MENU
 --========================================================
 
 local RadarPanel =
@@ -4853,6 +5087,12 @@ RadarClose.MouseButton1Click:
 
 		Saved.RadarMenuOpen =
 			false
+
+
+		Saved.RadarMenuPosition =
+			positionToTable(
+				RadarPanel.Position
+			)
 
 
 		saveSettings()
@@ -5616,6 +5856,7 @@ task.spawn(function()
 
 		if
 			not BasePart
+
 			or not BasePart.Parent
 		then
 
@@ -5626,12 +5867,14 @@ task.spawn(function()
 			if found then
 
 				if BaseBeam then
-					BaseBeam:Destroy()
+					BaseBeam:
+						Destroy()
 				end
 
 
 				if BaseAttachment then
-					BaseAttachment:Destroy()
+					BaseAttachment:
+						Destroy()
 				end
 
 
@@ -5644,6 +5887,7 @@ task.spawn(function()
 						"Attachment"
 					)
 
+
 				BaseAttachment.Parent =
 					found
 
@@ -5653,20 +5897,26 @@ task.spawn(function()
 						"Beam"
 					)
 
+
 				BaseBeam.Attachment0 =
 					getRootAttachment()
+
 
 				BaseBeam.Attachment1 =
 					BaseAttachment
 
+
 				BaseBeam.FaceCamera =
 					true
+
 
 				BaseBeam.Width0 =
 					0.65
 
+
 				BaseBeam.Width1 =
 					0.65
+
 
 				BaseBeam.Color =
 					ColorSequence.new(
@@ -5676,6 +5926,7 @@ task.spawn(function()
 							20
 						)
 					)
+
 
 				BaseBeam.Parent =
 					WorldFolder
@@ -5906,7 +6157,7 @@ end
 
 
 --========================================================
--- CONTROL ACTIONS
+-- BUTTON ACTIONS
 --========================================================
 
 NearestButton.MouseButton1Click:
@@ -5936,6 +6187,7 @@ NearestButton.MouseButton1Click:
 
 
 		refreshButtons()
+
 
 		saveSettings()
 
@@ -5970,6 +6222,7 @@ HighestButton.MouseButton1Click:
 
 		refreshButtons()
 
+
 		saveSettings()
 
 	end)
@@ -5992,6 +6245,7 @@ AutoKickButton.MouseButton1Click:
 
 		refreshButtons()
 
+
 		saveSettings()
 
 	end)
@@ -6010,8 +6264,8 @@ AutoHopButton.MouseButton1Click:
 
 		if autoHopEnabled then
 
-			-- User manually enabled it.
-			-- Leave this server even if it already has $20M+.
+			-- Manual re-enable means leave THIS server,
+			-- even if it already has $20M+.
 			autoHopManuallyRestarted =
 				true
 
@@ -6024,6 +6278,7 @@ AutoHopButton.MouseButton1Click:
 
 
 		refreshButtons()
+
 
 		saveSettings()
 
@@ -6042,6 +6297,7 @@ RadarCircleButton.MouseButton1Click:
 
 
 		refreshButtons()
+
 
 		saveSettings()
 
@@ -6072,12 +6328,25 @@ PlayerHighlightButton.MouseButton1Click:
 
 				end
 
+
+				if data.Name then
+
+					data.Name.TextColor3 =
+						Color3.new(
+							1,
+							1,
+							1
+						)
+
+				end
+
 			end
 
 		end
 
 
 		refreshButtons()
+
 
 		saveSettings()
 
@@ -6095,7 +6364,14 @@ RadarMenuButton.MouseButton1Click:
 			RadarPanel.Visible
 
 
+		Saved.RadarMenuPosition =
+			positionToTable(
+				RadarPanel.Position
+			)
+
+
 		refreshButtons()
+
 
 		saveSettings()
 
@@ -6113,7 +6389,14 @@ BrainrotMenuButton.MouseButton1Click:
 			BrainrotPanel.Visible
 
 
+		Saved.BrainrotMenuPosition =
+			positionToTable(
+				BrainrotPanel.Position
+			)
+
+
 		refreshButtons()
+
 
 		saveSettings()
 
@@ -6141,31 +6424,15 @@ BrainrotClose.MouseButton1Click:
 
 
 --========================================================
--- SERVER HOP
+-- HTTP
 --========================================================
 
-local hopping =
-	false
-
-
-local hopGeneration =
-	0
-
-
-local failedServers =
-	{}
-
-
-local pendingServer =
-	nil
-
-
-local function httpGet(
+local function executorGet(
 	url
 )
 
 	local ok,
-		result =
+		body =
 		pcall(function()
 
 			return
@@ -6179,15 +6446,15 @@ local function httpGet(
 
 	if
 		ok
-		and result
+		and body
 	then
 
-		return result
+		return body
 
 	end
 
 
-	local req =
+	local requestFunction =
 		request
 
 		or http_request
@@ -6198,13 +6465,18 @@ local function httpGet(
 		)
 
 
-	if type(req) == "function" then
+	if
+		type(
+			requestFunction
+		)
+		== "function"
+	then
 
 		local requestOK,
 			response =
 			pcall(function()
 
-				return req({
+				return requestFunction({
 
 					Url =
 						url,
@@ -6238,9 +6510,13 @@ local function httpGet(
 end
 
 
-local function fetchServerPage(
-	order,
-	cursor
+--========================================================
+-- SERVER PAGE
+--========================================================
+
+local function getServerPage(
+	cursor,
+	order
 )
 
 	local url =
@@ -6249,7 +6525,9 @@ local function fetchServerPage(
 			TARGET_PLACE_ID
 		)
 		.. "/servers/Public?sortOrder="
-		.. order
+		.. tostring(
+			order
+		)
 		.. "&limit=100"
 
 
@@ -6265,13 +6543,13 @@ local function fetchServerPage(
 	end
 
 
-	local body =
-		httpGet(
+	local raw =
+		executorGet(
 			url
 		)
 
 
-	if not body then
+	if not raw then
 		return nil
 	end
 
@@ -6283,7 +6561,7 @@ local function fetchServerPage(
 			return
 				HttpService:
 					JSONDecode(
-						body
+						raw
 					)
 
 		end)
@@ -6300,26 +6578,84 @@ end
 
 
 --========================================================
--- SERVER SEARCH
---
--- IMPORTANT:
--- visitedServers NEVER gets cleared by serverHop().
---
--- That means if you've already been there, it won't
--- intentionally choose that JobId again.
+-- SERVER HOP
 --========================================================
 
-local function collectServers()
+local hopping =
+	false
 
-	local results =
+
+local failedServers =
+	{}
+
+
+local pendingServer =
+	nil
+
+
+local function rotateOldServers()
+
+	if #recentOrder <= 1 then
+		return
+	end
+
+
+	local count =
+		math.max(
+			1,
+			math.floor(
+				#recentOrder
+				/ 2
+			)
+		)
+
+
+	for _ = 1, count do
+
+		local removed =
+			table.remove(
+				recentOrder,
+				1
+			)
+
+
+		if removed then
+
+			recentServers[
+				removed
+			] =
+				nil
+
+		end
+
+	end
+
+
+	-- Current server must remain excluded.
+	rememberServer(
+		game.JobId
+	)
+
+
+	saveRecentServers()
+
+end
+
+
+local function findFreshServer()
+
+	local started =
+		os.clock()
+
+
+	local candidates =
 		{}
 
 
-	local seenThisSearch =
+	local seen =
 		{}
 
 
-	-- Search both ends of Roblox's public list.
 	for _, order in ipairs({
 		"Asc",
 		"Desc"
@@ -6329,13 +6665,23 @@ local function collectServers()
 			nil
 
 
-		-- Search deeper than before.
-		for _ = 1, 10 do
+		for _ = 1, SERVER_SEARCH_PAGES do
+
+			if
+				os.clock()
+				- started
+				>= SERVER_SEARCH_TIMEOUT
+			then
+
+				break
+
+			end
+
 
 			local page =
-				fetchServerPage(
-					order,
-					cursor
+				getServerPage(
+					cursor,
+					order
 				)
 
 
@@ -6372,11 +6718,11 @@ local function collectServers()
 
 					and id ~= game.JobId
 
-					and not seenThisSearch[
+					and not seen[
 						id
 					]
 
-					and not visitedServers[
+					and not recentServers[
 						id
 					]
 
@@ -6391,14 +6737,14 @@ local function collectServers()
 					and playing < maxPlayers
 				then
 
-					seenThisSearch[
+					seen[
 						id
 					] =
 						true
 
 
 					table.insert(
-						results,
+						candidates,
 						server
 					)
 
@@ -6416,8 +6762,7 @@ local function collectServers()
 			end
 
 
-			-- Enough choices; don't waste time.
-			if #results >= 150 then
+			if #candidates >= 100 then
 				break
 			end
 
@@ -6426,37 +6771,22 @@ local function collectServers()
 	end
 
 
-	return results
-
-end
-
-
-local function chooseRandomNewServer()
-
-	local servers =
-		collectServers()
-
-
-	if #servers == 0 then
+	if #candidates == 0 then
 		return nil
 	end
 
 
 	return
-		servers[
+		candidates[
 			RNG:
 				NextInteger(
 					1,
-					#servers
+					#candidates
 				)
 		]
 
 end
 
-
---========================================================
--- TELEPORT FAILURE CALLBACK
---========================================================
 
 pcall(function()
 
@@ -6488,10 +6818,6 @@ pcall(function()
 end)
 
 
---========================================================
--- SERVER HOP FUNCTION
---========================================================
-
 local function serverHop()
 
 	if hopping then
@@ -6503,239 +6829,214 @@ local function serverHop()
 		true
 
 
-	hopGeneration +=
-		1
-
-
-	local generation =
-		hopGeneration
-
-
 	local startingJob =
 		game.JobId
 
 
-	HopButton.Text =
-		"FINDING..."
-
-
-	HopButton.TextSize =
-		14
-
-
-	while
-		Gui.Parent
-
-		and hopping
-
-		and generation
-			== hopGeneration
-	do
-
-		--============================================
-		-- FIND A SERVER WE HAVE NEVER USED BEFORE
-		--============================================
-
-		local server =
-			chooseRandomNewServer()
-
-
-		if not server then
-
-			HopButton.Text =
-				"REFRESHING..."
-
-
-			-- Do NOT clear visitedServers.
-			--
-			-- Just wait a tiny amount and pull fresh
-			-- server pages again.
-			task.wait(
-				NO_SERVER_RETRY
-			)
-
-
-			continue
-
-		end
-
-
-		local serverId =
-			server.id
-
-
-		-- Double-check everything right before teleport.
-		if
-			not serverId
-
-			or serverId == ""
-
-			or serverId == game.JobId
-
-			or visitedServers[
-				serverId
-			]
-
-			or failedServers[
-				serverId
-			]
-		then
-
-			task.wait()
-
-			continue
-
-		end
-
-
-		--============================================
-		-- BLACKLIST THE TARGET BEFORE TELEPORTING.
-		--
-		-- Therefore even if the next script starts fast,
-		-- the previous target is already saved.
-		--============================================
-
-		rememberVisitedServer(
-			serverId
-		)
-
-
-		pendingServer =
-			serverId
-
-
-		HopButton.Text =
-			"HOPPING..."
-
-
-		local teleportCallWorked =
-			pcall(function()
-
-				TeleportService:
-					TeleportToPlaceInstance(
-
-						TARGET_PLACE_ID,
-
-						serverId,
-
-						LP
-
-					)
-
-			end)
-
-
-		if not teleportCallWorked then
-
-			failedServers[
-				serverId
-			] =
-				true
-
-
-			pendingServer =
-				nil
-
-
-			HopButton.Text =
-				"RETRYING..."
-
-
-			task.wait(
-				HOP_RETRY_DELAY
-			)
-
-
-			continue
-
-		end
-
-
-		--============================================
-		-- WATCHDOG
-		--
-		-- If Roblox does nothing and we are still in
-		-- exactly the same JobId, choose ANOTHER JobId.
-		--============================================
-
-		local deadline =
-			os.clock()
-			+ HOP_WATCHDOG_TIME
-
+	task.spawn(function()
 
 		while
 			Gui.Parent
-
-			and generation
-				== hopGeneration
-
-			and os.clock()
-				< deadline
+			and hopping
 		do
 
-			if
-				game.JobId
-				~= startingJob
-			then
+			HopButton.Text =
+				"FINDING..."
 
-				return true
+
+			HopButton.TextSize =
+				14
+
+
+			local target =
+				findFreshServer()
+
+
+			if not target then
+
+				-- We found no NEW server among the
+				-- recent blacklist. Rotate oldest entries
+				-- instead of sitting on REFRESHING forever.
+
+				HopButton.Text =
+					"RETRYING..."
+
+
+				rotateOldServers()
+
+
+				task.wait(
+					NO_SERVER_RETRY
+				)
+
+
+				continue
 
 			end
 
 
-			task.wait(
-				0.05
-			)
-
-		end
+			local serverId =
+				target.id
 
 
-		-- Still here = teleport didn't actually move us.
-		if
-			game.JobId
-			== startingJob
-		then
+			if
+				not serverId
 
-			failedServers[
+				or serverId == ""
+
+				or serverId == game.JobId
+
+				or recentServers[
+					serverId
+				]
+
+				or failedServers[
+					serverId
+				]
+			then
+
+				task.wait()
+
+				continue
+
+			end
+
+
+			-- Save target immediately.
+			rememberServer(
 				serverId
-			] =
-				true
+			)
 
 
 			pendingServer =
-				nil
+				serverId
 
 
 			HopButton.Text =
-				"RETRYING..."
+				"HOPPING..."
 
 
-			task.wait(
-				HOP_RETRY_DELAY
-			)
+			local teleportStarted =
+				pcall(function()
 
-		else
+					TeleportService:
+						TeleportToPlaceInstance(
 
-			return true
+							TARGET_PLACE_ID,
+
+							serverId,
+
+							LP
+
+						)
+
+				end)
+
+
+			if not teleportStarted then
+
+				failedServers[
+					serverId
+				] =
+					true
+
+
+				pendingServer =
+					nil
+
+
+				HopButton.Text =
+					"RETRYING..."
+
+
+				task.wait(
+					HOP_RETRY_DELAY
+				)
+
+
+				continue
+
+			end
+
+
+			local watchdogStarted =
+				os.clock()
+
+
+			while
+				Gui.Parent
+
+				and hopping
+
+				and os.clock()
+					- watchdogStarted
+					< TELEPORT_WATCHDOG
+			do
+
+				if
+					game.JobId
+					~= startingJob
+				then
+
+					return
+
+				end
+
+
+				task.wait(
+					0.05
+				)
+
+			end
+
+
+			if
+				game.JobId
+				== startingJob
+			then
+
+				failedServers[
+					serverId
+				] =
+					true
+
+
+				pendingServer =
+					nil
+
+
+				HopButton.Text =
+					"RETRYING..."
+
+
+				task.wait(
+					HOP_RETRY_DELAY
+				)
+
+			else
+
+				return
+
+			end
 
 		end
 
-	end
+
+		hopping =
+			false
 
 
-	hopping =
-		false
+		HopButton.Text =
+			"HOP"
 
 
-	HopButton.Text =
-		"HOP"
+		HopButton.TextSize =
+			24
+
+	end)
 
 
-	HopButton.TextSize =
-		24
-
-
-	return false
+	return true
 
 end
 
@@ -6743,9 +7044,7 @@ end
 HopButton.MouseButton1Click:
 	Connect(function()
 
-		task.spawn(
-			serverHop
-		)
+		serverHop()
 
 	end)
 
@@ -6766,9 +7065,7 @@ UserInputService.InputBegan:
 			== Enum.KeyCode.Z
 		then
 
-			task.spawn(
-				serverHop
-			)
+			serverHop()
 
 		end
 
@@ -6776,29 +7073,81 @@ UserInputService.InputBegan:
 
 
 --========================================================
--- AUTO HOP
+-- WAIT FOR SERVER DATA
+--========================================================
+
+local function waitForServerData()
+
+	local elapsed =
+		os.clock()
+		- SERVER_JOINED_AT
+
+
+	if elapsed < AUTO_HOP_JOIN_WAIT then
+
+		task.wait(
+			AUTO_HOP_JOIN_WAIT
+			- elapsed
+		)
+
+	end
+
+
+	local started =
+		os.clock()
+
+
+	while Gui.Parent do
+
+		scanMoney()
+
+
+		if next(
+			MoneyTargets
+		)
+			~= nil
+		then
+
+			return true
+
+		end
+
+
+		if
+			os.clock()
+			- started
+			>= DATA_READY_TIMEOUT
+		then
+
+			return false
+
+		end
+
+
+		task.wait(
+			0.1
+		)
+
+	end
+
+
+	return false
+
+end
+
+
+--========================================================
+-- AUTO HOP LOOP
 --========================================================
 
 task.spawn(function()
 
-	--====================================================
-	-- WAIT EXACTLY 1 SECOND AFTER SCRIPT LOAD/JOIN
-	--====================================================
+	-- Auto Hop carried from another server:
+	-- wait for actual server data first.
 
-	local remaining =
-		AUTO_HOP_JOIN_WAIT
+	if autoHopEnabled then
 
-		- (
-			os.clock()
-			- SERVER_JOINED_AT
-		)
-
-
-	if remaining > 0 then
-
-		task.wait(
-			remaining
-		)
+		waitForServerData()
 
 	end
 
@@ -6807,7 +7156,6 @@ task.spawn(function()
 
 		if autoHopEnabled then
 
-			-- Refresh the money data first.
 			scanMoney()
 
 
@@ -6815,12 +7163,6 @@ task.spawn(function()
 				data =
 				hasGoodBrainrot()
 
-
-			--============================================
-			-- ARRIVED FROM AUTO HOP
-			--
-			-- $20M+ -> stop hopping.
-			--============================================
 
 			if
 				found
@@ -6843,7 +7185,7 @@ task.spawn(function()
 
 
 				print(
-					"[FTX] AUTO HOP OFF - FOUND",
+					"[FTX] AUTO HOP STOPPED - FOUND:",
 					data
 					and data.Text
 					or "$20M+/s"
@@ -6852,19 +7194,7 @@ task.spawn(function()
 
 			elseif not hopping then
 
-				--========================================
-				-- NO $20M+
-				--
-				-- OR:
-				-- user manually turned Auto Hop back ON
-				-- while in a $20M+ server.
-				--
-				-- Find another NEVER-VISITED server.
-				--========================================
-
-				task.spawn(
-					serverHop
-				)
+				serverHop()
 
 			end
 
@@ -6920,6 +7250,7 @@ task.spawn(function()
 
 		if
 			SelectedBeam
+
 			and attachment
 		then
 
@@ -7024,7 +7355,7 @@ LP.CharacterAdded:
 
 
 --========================================================
--- PERIODIC SAVE
+-- SAVE LOOP
 --========================================================
 
 task.spawn(function()
@@ -7090,8 +7421,8 @@ task.spawn(function()
 			playerHighlightEnabled
 
 
-		Saved.VisitedServers =
-			visitedServers
+		Saved.RecentServers =
+			recentOrder
 
 
 		saveSettings()
@@ -7102,7 +7433,7 @@ end)
 
 
 --========================================================
--- INITIAL UPDATE
+-- INITIAL UI
 --========================================================
 
 refreshButtons()
@@ -7112,63 +7443,42 @@ refreshButtons()
 -- DONE
 --========================================================
 
-local visitedCount =
-	0
-
-
-for _ in pairs(
-	visitedServers
-) do
-
-	visitedCount +=
-		1
-
-end
-
-
 print(
 	"[FTX] FULL SCRIPT LOADED"
 )
 
 
 print(
-	"[FTX] AUTO HOP JOIN WAIT = 1 SECOND"
+	"[FTX] AUTO HOP WAIT =",
+	AUTO_HOP_JOIN_WAIT
 )
 
 
 print(
-	"[FTX] CURRENT JOB BLACKLISTED =",
+	"[FTX] DATA READY TIMEOUT =",
+	DATA_READY_TIMEOUT
+)
+
+
+print(
+	"[FTX] CURRENT SERVER =",
 	game.JobId
 )
 
 
 print(
-	"[FTX] SAVED VISITED SERVERS =",
-	visitedCount
-)
-
-
-print(
-	"[FTX] PREVIOUSLY VISITED JOBIDS WILL NOT BE SELECTED"
-)
-
-
-print(
-	"[FTX] FULL SERVERS ARE SKIPPED"
-)
-
-
-print(
-	"[FTX] FAILED SERVERS ARE SKIPPED"
-)
-
-
-print(
-	"[FTX] NO RANDOM TELEPORT FALLBACK"
+	"[FTX] RECENT SERVERS =",
+	#recentOrder
 )
 
 
 print(
 	"[FTX] $20M SOUND =",
 	GOOD_SOUND_ID
+)
+
+
+print(
+	"[FTX] SETTINGS SAVE =",
+	canSave
 )

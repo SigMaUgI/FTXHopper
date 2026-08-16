@@ -1,33 +1,42 @@
 --========================================================
 -- FTX ALL-IN-ONE
 --
--- NEW:
--- • HOP remains standalone.
--- • ALL other controls moved into ONE menu.
--- • Control menu draggable.
--- • Control menu closable/reopenable.
--- • Radar menu draggable + closable.
--- • Brainrot menu draggable + closable.
+-- FEATURES
+-- • Standalone HOP button
+-- • Z = manual server hop
 --
--- SAVED ACROSS REJOINS:
--- • Nearest Steal ON/OFF
--- • Highest Money ON/OFF
--- • Auto Kick ON/OFF
--- • Radar Circle ON/OFF
--- • Player Highlight ON/OFF
--- • Main menu open/closed
--- • Radar menu open/closed
--- • Brainrot menu open/closed
--- • Main menu position
--- • Radar menu position
--- • Brainrot menu position
+-- FTX CONTROLS MENU:
+-- • Nearest Steal
+-- • Highest Money Steal
+-- • Auto Kick
+-- • Auto Hop
+-- • Radar Circle
+-- • Player Highlight
+-- • Radar Menu
+-- • Brainrot Menu
 --
--- DEFAULT FIRST RUN:
--- • Nearest Steal OFF
--- • Highest Money OFF
--- • Auto Kick ON
--- • Radar Circle ON
--- • Player Highlight ON
+-- AUTO HOP:
+-- • Waits at least 2 seconds after joining each server
+-- • Scans for $20M/sec+
+-- • If $20M/sec+ is found -> AUTO HOP turns OFF
+-- • If nothing is found -> hops again
+-- • If hop fails -> automatically retries
+-- • Avoids current server
+-- • Avoids full servers
+-- • Saves AUTO HOP state across rejoins
+--
+-- SAVES ACROSS REJOINS:
+-- • Toggle states
+-- • Menu open/closed states
+-- • Menu positions
+--
+-- PC:
+-- • Full-size menus
+-- • HOP bottom-right
+--
+-- PHONE:
+-- • Menus 50%
+-- • HOP top-middle
 --========================================================
 
 
@@ -92,6 +101,10 @@ local RNG =
 	Random.new()
 
 
+local SCRIPT_STARTED_AT =
+	os.clock()
+
+
 --========================================================
 -- SETTINGS
 --========================================================
@@ -152,6 +165,18 @@ local TELEPORT_TIMEOUT =
 	2.5
 
 
+local TELEPORT_RETRY_DELAY =
+	0.6
+
+
+local AUTO_HOP_LOAD_WAIT =
+	2
+
+
+local AUTO_HOP_RECHECK_RATE =
+	0.25
+
+
 local MOBILE_MENU_SCALE =
 	0.5
 
@@ -161,7 +186,7 @@ local SAVE_FILE =
 
 
 --========================================================
--- DEFAULT SAVED DATA
+-- DEFAULT SAVE DATA
 --========================================================
 
 local Saved = {
@@ -174,6 +199,9 @@ local Saved = {
 
 	AutoKick =
 		true,
+
+	AutoHop =
+		false,
 
 	RadarCircle =
 		true,
@@ -232,11 +260,15 @@ local Saved = {
 --========================================================
 
 local canSave =
-	typeof(writefile) == "function"
 
-	and typeof(readfile) == "function"
+	typeof(writefile)
+	== "function"
 
-	and typeof(isfile) == "function"
+	and typeof(readfile)
+	== "function"
+
+	and typeof(isfile)
+	== "function"
 
 
 local function mergeSettings(
@@ -284,46 +316,36 @@ local function loadSettings()
 	end
 
 
-	local ok =
-		pcall(function()
+	pcall(function()
 
-			if not isfile(
+		if not isfile(
+			SAVE_FILE
+		) then
+
+			return
+
+		end
+
+
+		local raw =
+			readfile(
 				SAVE_FILE
-			) then
-
-				return
-
-			end
+			)
 
 
-			local raw =
-				readfile(
-					SAVE_FILE
+		local decoded =
+			HttpService:
+				JSONDecode(
+					raw
 				)
 
 
-			local decoded =
-				HttpService:
-					JSONDecode(
-						raw
-					)
-
-
-			mergeSettings(
-				Saved,
-				decoded
-			)
-
-		end)
-
-
-	if not ok then
-
-		warn(
-			"[FTX] Failed loading settings"
+		mergeSettings(
+			Saved,
+			decoded
 		)
 
-	end
+	end)
 
 end
 
@@ -432,7 +454,6 @@ pcall(function()
 				"FTX_AllInOne"
 			)
 
-
 	if old then
 		old:Destroy()
 	end
@@ -448,7 +469,6 @@ pcall(function()
 				"FTX_WORLD"
 			)
 
-
 	if old then
 		old:Destroy()
 	end
@@ -457,7 +477,7 @@ end)
 
 
 --========================================================
--- MAIN GUI
+-- GUI
 --========================================================
 
 local Gui =
@@ -528,7 +548,6 @@ local function corner(
 	object.Parent =
 		parent
 
-
 	return object
 
 end
@@ -550,6 +569,7 @@ local function stroke(
 
 	object.Color =
 		color
+
 		or Color3.fromRGB(
 			90,
 			90,
@@ -558,7 +578,6 @@ local function stroke(
 
 	object.Parent =
 		parent
-
 
 	return object
 
@@ -576,7 +595,6 @@ local function addScale(
 			FindFirstChild(
 				name
 			)
-
 
 	if old then
 		old:Destroy()
@@ -597,14 +615,13 @@ local function addScale(
 	scale.Parent =
 		object
 
-
 	return scale
 
 end
 
 
 --========================================================
--- GENERIC DRAG + SAVE
+-- DRAG SYSTEM
 --========================================================
 
 local function makeDraggable(
@@ -617,7 +634,7 @@ local function makeDraggable(
 		false
 
 
-	local dragStart =
+	local startInput =
 		nil
 
 
@@ -639,10 +656,8 @@ local function makeDraggable(
 				dragging =
 					true
 
-
-				dragStart =
+				startInput =
 					input.Position
-
 
 				startPosition =
 					panel.Position
@@ -671,7 +686,9 @@ local function makeDraggable(
 
 					if saveKey then
 
-						Saved[saveKey] =
+						Saved[
+							saveKey
+						] =
 							positionToTable(
 								panel.Position
 							)
@@ -711,7 +728,7 @@ local function makeDraggable(
 
 			local delta =
 				input.Position
-				- dragStart
+				- startInput
 
 
 			panel.Position =
@@ -735,8 +752,88 @@ end
 
 
 --========================================================
+-- ROOT
+--========================================================
+
+local RootAttachment =
+	nil
+
+
+local function getRoot()
+
+	local character =
+		LP.Character
+
+
+	if not character then
+		return nil
+	end
+
+
+	return
+		character:
+			FindFirstChild(
+				"HumanoidRootPart"
+			)
+
+end
+
+
+local function getRootAttachment()
+
+	local root =
+		getRoot()
+
+
+	if not root then
+		return nil
+	end
+
+
+	if
+		RootAttachment
+
+		and RootAttachment.Parent
+			== root
+	then
+
+		return
+			RootAttachment
+
+	end
+
+
+	RootAttachment =
+		root:
+			FindFirstChild(
+				"FTX_ROOT"
+			)
+
+
+	if not RootAttachment then
+
+		RootAttachment =
+			Instance.new(
+				"Attachment"
+			)
+
+		RootAttachment.Name =
+			"FTX_ROOT"
+
+		RootAttachment.Parent =
+			root
+
+	end
+
+
+	return
+		RootAttachment
+
+end
+
+
+--========================================================
 -- HOP BUTTON
--- STAYS OUTSIDE ALL MENUS
 --========================================================
 
 local HopHolder =
@@ -843,6 +940,7 @@ HopGradient.Color =
 
 		ColorSequenceKeypoint.new(
 			0,
+
 			Color3.fromRGB(
 				255,
 				95,
@@ -852,6 +950,7 @@ HopGradient.Color =
 
 		ColorSequenceKeypoint.new(
 			0.5,
+
 			Color3.fromRGB(
 				255,
 				240,
@@ -861,6 +960,7 @@ HopGradient.Color =
 
 		ColorSequenceKeypoint.new(
 			1,
+
 			Color3.fromRGB(
 				255,
 				125,
@@ -942,7 +1042,7 @@ MainMenu.Size =
 		0,
 		285,
 		0,
-		390
+		445
 	)
 
 MainMenu.BackgroundColor3 =
@@ -959,7 +1059,8 @@ MainMenu.BorderSizePixel =
 	0
 
 MainMenu.Visible =
-	Saved.MainMenuOpen ~= false
+	Saved.MainMenuOpen
+	~= false
 
 MainMenu.Parent =
 	Gui
@@ -981,10 +1082,6 @@ stroke(
 	)
 )
 
-
---========================================================
--- MAIN MENU HEADER
---========================================================
 
 local MainHeader =
 	Instance.new(
@@ -1028,24 +1125,20 @@ MainHeader.Parent =
 	MainMenu
 
 
-local MainHeaderPadding =
+local MainPadding =
 	Instance.new(
 		"UIPadding"
 	)
 
-MainHeaderPadding.PaddingLeft =
+MainPadding.PaddingLeft =
 	UDim.new(
 		0,
 		14
 	)
 
-MainHeaderPadding.Parent =
+MainPadding.Parent =
 	MainHeader
 
-
---========================================================
--- MAIN CLOSE BUTTON
---========================================================
 
 local MainClose =
 	Instance.new(
@@ -1109,11 +1202,6 @@ corner(
 	10
 )
 
-
---========================================================
--- MAIN MENU OPENER
--- ALWAYS EXISTS
---========================================================
 
 local MainOpen =
 	Instance.new(
@@ -1198,20 +1286,16 @@ MainClose.MouseButton1Click:
 		MainMenu.Visible =
 			false
 
-
 		MainOpen.Visible =
 			true
 
-
 		Saved.MainMenuOpen =
 			false
-
 
 		Saved.MainMenuPosition =
 			positionToTable(
 				MainMenu.Position
 			)
-
 
 		saveSettings()
 
@@ -1224,14 +1308,11 @@ MainOpen.MouseButton1Click:
 		MainMenu.Visible =
 			true
 
-
 		MainOpen.Visible =
 			false
 
-
 		Saved.MainMenuOpen =
 			true
-
 
 		saveSettings()
 
@@ -1246,7 +1327,7 @@ makeDraggable(
 
 
 --========================================================
--- MAIN MENU SCROLL
+-- CONTROLS LIST
 --========================================================
 
 local ControlsList =
@@ -1303,10 +1384,6 @@ ControlsLayout.Padding =
 ControlsLayout.Parent =
 	ControlsList
 
-
---========================================================
--- CONTROL BUTTON CREATOR
---========================================================
 
 local function createMenuButton(
 	title
@@ -1400,6 +1477,13 @@ local AutoKickButton,
 	)
 
 
+local AutoHopButton,
+	AutoHopStroke =
+	createMenuButton(
+		"AUTO HOP"
+	)
+
+
 local RadarCircleButton,
 	RadarCircleStroke =
 	createMenuButton(
@@ -1429,7 +1513,7 @@ local BrainrotMenuButton,
 
 
 --========================================================
--- ACTIVE STATES FROM SAVED DATA
+-- STATES
 --========================================================
 
 local nearestEnabled =
@@ -1442,7 +1526,6 @@ local highestEnabled =
 	== true
 
 
--- Don't allow both auto-steal modes simultaneously.
 if
 	nearestEnabled
 	and highestEnabled
@@ -1462,6 +1545,11 @@ local autoKickEnabled =
 	~= false
 
 
+local autoHopEnabled =
+	Saved.AutoHop
+	== true
+
+
 local radarCircleEnabled =
 	Saved.RadarCircle
 	~= false
@@ -1473,7 +1561,7 @@ local playerHighlightEnabled =
 
 
 --========================================================
--- BUTTON VISUAL FIX
+-- TOGGLE VISUAL
 --========================================================
 
 local function updateToggle(
@@ -1541,87 +1629,7 @@ end
 
 
 --========================================================
--- ROOT HELPERS
---========================================================
-
-local RootAttachment =
-	nil
-
-
-local function getRoot()
-
-	local character =
-		LP.Character
-
-
-	if not character then
-		return nil
-	end
-
-
-	return
-		character:
-			FindFirstChild(
-				"HumanoidRootPart"
-			)
-
-end
-
-
-local function getRootAttachment()
-
-	local root =
-		getRoot()
-
-
-	if not root then
-		return nil
-	end
-
-
-	if
-		RootAttachment
-		and RootAttachment.Parent
-			== root
-	then
-
-		return
-			RootAttachment
-
-	end
-
-
-	RootAttachment =
-		root:
-			FindFirstChild(
-				"FTX_ROOT"
-			)
-
-
-	if not RootAttachment then
-
-		RootAttachment =
-			Instance.new(
-				"Attachment"
-			)
-
-		RootAttachment.Name =
-			"FTX_ROOT"
-
-		RootAttachment.Parent =
-			root
-
-	end
-
-
-	return
-		RootAttachment
-
-end
-
-
---========================================================
--- MONEY PARSER
+-- MONEY
 --========================================================
 
 local function parseMoney(
@@ -1684,30 +1692,30 @@ local function parseMoney(
 	end
 
 
-	local multiplier =
+	local mult =
 		1
 
 
 	if suffix == "K" then
-		multiplier = 1e3
+		mult = 1e3
 
 	elseif suffix == "M" then
-		multiplier = 1e6
+		mult = 1e6
 
 	elseif suffix == "B" then
-		multiplier = 1e9
+		mult = 1e9
 
 	elseif suffix == "T" then
-		multiplier = 1e12
+		mult = 1e12
 
 	elseif suffix == "Q" then
-		multiplier = 1e15
+		mult = 1e15
 	end
 
 
 	return
 		number
-		* multiplier
+		* mult
 
 end
 
@@ -1765,7 +1773,7 @@ end
 
 
 --========================================================
--- WORLD GUI -> PART
+-- WORLD PART
 --========================================================
 
 local function getWorldPart(
@@ -1805,7 +1813,8 @@ local function getWorldPart(
 					)
 				then
 
-					return adornee
+					return
+						adornee
 
 				end
 
@@ -1833,22 +1842,18 @@ local function getWorldPart(
 		end
 
 
-		if
-			current:IsA(
-				"BasePart"
-			)
-		then
+		if current:IsA(
+			"BasePart"
+		) then
 
 			return current
 
 		end
 
 
-		if
-			current:IsA(
-				"Model"
-			)
-		then
+		if current:IsA(
+			"Model"
+		) then
 
 			return
 				current.PrimaryPart
@@ -2067,7 +2072,7 @@ end
 
 
 --========================================================
--- BRAINROT DATA
+-- BRAINROT STORAGE
 --========================================================
 
 local MoneyTargets =
@@ -2083,7 +2088,48 @@ local BrainrotESP =
 
 
 --========================================================
--- SELECTED BRAINROT LINE
+-- AUTO HOP MONEY CHECK
+--========================================================
+
+local function hasGoodBrainrot()
+
+	for label, data in pairs(
+		MoneyTargets
+	) do
+
+		if
+			label
+			and label.Parent
+
+			and data
+
+			and data.Value
+
+			and data.Value >= MIN_MONEY
+
+			and data.Part
+
+			and data.Part.Parent
+		then
+
+			return
+				true,
+				data
+
+		end
+
+	end
+
+
+	return
+		false,
+		nil
+
+end
+
+
+--========================================================
+-- SELECTED BRAINROT
 --========================================================
 
 local SelectedLabel =
@@ -2372,6 +2418,11 @@ local function createBrainrotESP(
 
 	local function update()
 
+		if not label.Parent then
+			return
+		end
+
+
 		text.Text =
 			findBrainrotName(
 				label
@@ -2573,10 +2624,12 @@ end
 
 local function scanMoney()
 
-	for i, object in ipairs(
-		workspace:
-			GetDescendants()
-	) do
+	for index,
+		object in ipairs(
+			workspace:
+				GetDescendants()
+		)
+	do
 
 		if
 			object:IsA(
@@ -2599,7 +2652,7 @@ local function scanMoney()
 		end
 
 
-		if i % 500 == 0 then
+		if index % 500 == 0 then
 			task.wait()
 		end
 
@@ -2626,7 +2679,6 @@ task.spawn(function()
 		task.wait(
 			MONEY_RESCAN_RATE
 		)
-
 
 		scanMoney()
 
@@ -2883,16 +2935,13 @@ BrainrotClose.MouseButton1Click:
 		BrainrotPanel.Visible =
 			false
 
-
 		Saved.BrainrotMenuOpen =
 			false
-
 
 		Saved.BrainrotMenuPosition =
 			positionToTable(
 				BrainrotPanel.Position
 			)
-
 
 		saveSettings()
 
@@ -2900,7 +2949,7 @@ BrainrotClose.MouseButton1Click:
 
 
 --========================================================
--- BRAINROT LIST REFRESH
+-- BRAINROT LIST
 --========================================================
 
 local function refreshBrainrotList()
@@ -2933,7 +2982,8 @@ local function refreshBrainrotList()
 		if
 			label.Parent
 
-			and data.Value >= MIN_MONEY
+			and data.Value
+				>= MIN_MONEY
 
 			and data.Part
 
@@ -3419,6 +3469,7 @@ ProgressGradient.Color =
 
 		ColorSequenceKeypoint.new(
 			0,
+
 			Color3.fromRGB(
 				255,
 				95,
@@ -3428,6 +3479,7 @@ ProgressGradient.Color =
 
 		ColorSequenceKeypoint.new(
 			0.5,
+
 			Color3.fromRGB(
 				255,
 				230,
@@ -3437,6 +3489,7 @@ ProgressGradient.Color =
 
 		ColorSequenceKeypoint.new(
 			1,
+
 			Color3.fromRGB(
 				255,
 				130,
@@ -3450,8 +3503,51 @@ ProgressGradient.Parent =
 	ProgressFill
 
 
+task.spawn(function()
+
+	while Gui.Parent do
+
+		ProgressGradient.Offset =
+			Vector2.new(
+				-1,
+				0
+			)
+
+
+		local tween =
+			TweenService:
+				Create(
+
+					ProgressGradient,
+
+					TweenInfo.new(
+						1.1,
+						Enum.EasingStyle.Linear
+					),
+
+					{
+						Offset =
+							Vector2.new(
+								1,
+								0
+							)
+					}
+
+				)
+
+
+		tween:Play()
+
+		tween.Completed:
+			Wait()
+
+	end
+
+end)
+
+
 --========================================================
--- PROMPTS
+-- PROXIMITY PROMPTS
 --========================================================
 
 local Prompts =
@@ -3561,12 +3657,10 @@ workspace.DescendantRemoving:
 		] =
 			nil
 
-
 		VisiblePrompts[
 			object
 		] =
 			nil
-
 
 		PromptBlocked[
 			object
@@ -3638,17 +3732,28 @@ local function promptPosition(
 	end
 
 
-	local part =
+	local model =
 		prompt.Parent:
 			FindFirstAncestorWhichIsA(
-				"BasePart"
+				"Model"
 			)
 
 
-	if part then
+	if model then
 
-		return
-			part.Position
+		local part =
+			model.PrimaryPart
+
+			or model:
+				FindFirstChildWhichIsA(
+					"BasePart",
+					true
+				)
+
+
+		if part then
+			return part.Position
+		end
 
 	end
 
@@ -3861,7 +3966,6 @@ local function promptMoney(
 				closest =
 					distance
 
-
 				value =
 					data.Value
 
@@ -3908,7 +4012,6 @@ local function getHighestSteal()
 
 				bestMoney =
 					money
-
 
 				best =
 					prompt
@@ -4076,18 +4179,14 @@ local function performHold(
 		holdConnection:
 			Disconnect()
 
-
 		triggerConnection:
 			Disconnect()
-
 
 		currentPrompt =
 			nil
 
-
 		stealing =
 			false
-
 
 		return
 
@@ -4132,7 +4231,6 @@ local function performHold(
 		holdConnection:
 			Disconnect()
 
-
 		triggerConnection:
 			Disconnect()
 
@@ -4140,10 +4238,8 @@ local function performHold(
 		currentPrompt =
 			nil
 
-
 		stealing =
 			false
-
 
 		return
 
@@ -4252,7 +4348,6 @@ local function performHold(
 	holdConnection:
 		Disconnect()
 
-
 	triggerConnection:
 		Disconnect()
 
@@ -4277,6 +4372,7 @@ local function performHold(
 
 
 		task.delay(
+
 			RESET_FALLBACK,
 
 			function()
@@ -4287,6 +4383,7 @@ local function performHold(
 					nil
 
 			end
+
 		)
 
 	else
@@ -4609,16 +4706,13 @@ RadarClose.MouseButton1Click:
 		RadarPanel.Visible =
 			false
 
-
 		Saved.RadarMenuOpen =
 			false
-
 
 		Saved.RadarMenuPosition =
 			positionToTable(
 				RadarPanel.Position
 			)
-
 
 		saveSettings()
 
@@ -4845,10 +4939,8 @@ local function setupPlayer(
 		data.Billboard =
 			billboard
 
-
 		data.Name =
 			name
-
 
 		data.Highlight =
 			highlight
@@ -5597,7 +5689,7 @@ PlayerGui.DescendantAdded:
 
 
 --========================================================
--- MAIN MENU BUTTON ACTIONS
+-- BUTTON REFRESH
 --========================================================
 
 local function refreshButtons()
@@ -5623,6 +5715,14 @@ local function refreshButtons()
 		AutoKickStroke,
 		"AUTO KICK",
 		autoKickEnabled
+	)
+
+
+	updateToggle(
+		AutoHopButton,
+		AutoHopStroke,
+		"AUTO HOP",
+		autoHopEnabled
 	)
 
 
@@ -5660,6 +5760,10 @@ local function refreshButtons()
 end
 
 
+--========================================================
+-- CONTROL BUTTONS
+--========================================================
+
 NearestButton.MouseButton1Click:
 	Connect(function()
 
@@ -5685,9 +5789,7 @@ NearestButton.MouseButton1Click:
 
 		cancelCurrentHold()
 
-
 		refreshButtons()
-
 
 		saveSettings()
 
@@ -5719,9 +5821,7 @@ HighestButton.MouseButton1Click:
 
 		cancelCurrentHold()
 
-
 		refreshButtons()
-
 
 		saveSettings()
 
@@ -5745,6 +5845,23 @@ AutoKickButton.MouseButton1Click:
 
 		refreshButtons()
 
+		saveSettings()
+
+	end)
+
+
+AutoHopButton.MouseButton1Click:
+	Connect(function()
+
+		autoHopEnabled =
+			not autoHopEnabled
+
+
+		Saved.AutoHop =
+			autoHopEnabled
+
+
+		refreshButtons()
 
 		saveSettings()
 
@@ -5763,7 +5880,6 @@ RadarCircleButton.MouseButton1Click:
 
 
 		refreshButtons()
-
 
 		saveSettings()
 
@@ -5788,10 +5904,8 @@ PlayerHighlightButton.MouseButton1Click:
 			) do
 
 				if data.Highlight then
-
 					data.Highlight.Enabled =
 						false
-
 				end
 
 
@@ -5812,7 +5926,6 @@ PlayerHighlightButton.MouseButton1Click:
 
 
 		refreshButtons()
-
 
 		saveSettings()
 
@@ -5838,7 +5951,6 @@ RadarMenuButton.MouseButton1Click:
 
 		refreshButtons()
 
-
 		saveSettings()
 
 	end)
@@ -5863,13 +5975,11 @@ BrainrotMenuButton.MouseButton1Click:
 
 		refreshButtons()
 
-
 		saveSettings()
 
 	end)
 
 
--- Keep menu-toggle text synced after X buttons.
 RadarClose.MouseButton1Click:
 	Connect(function()
 
@@ -5894,7 +6004,7 @@ refreshButtons()
 
 
 --========================================================
--- SERVER HOP
+-- SERVER HOP SYSTEM
 --========================================================
 
 local hopping =
@@ -5909,8 +6019,94 @@ local failed =
 	{}
 
 
+local pendingServer =
+	nil
+
+
+local hopAttemptToken =
+	0
+
+
+local function executorHttpGet(
+	url
+)
+
+	local ok,
+		result =
+		pcall(function()
+
+			return
+				game:
+					HttpGet(
+						url
+					)
+
+		end)
+
+
+	if
+		ok
+		and result
+	then
+
+		return result
+
+	end
+
+
+	local req =
+		request
+		or http_request
+		or (
+			syn
+			and syn.request
+		)
+
+
+	if
+		type(req)
+		== "function"
+	then
+
+		local requestOK,
+			response =
+			pcall(function()
+
+				return req({
+
+					Url =
+						url,
+
+					Method =
+						"GET"
+
+				})
+
+			end)
+
+
+		if
+			requestOK
+			and response
+			and response.Body
+		then
+
+			return
+				response.Body
+
+		end
+
+	end
+
+
+	return nil
+
+end
+
+
 local function requestServers(
-	cursor
+	cursor,
+	order
 )
 
 	local url =
@@ -5918,7 +6114,12 @@ local function requestServers(
 		.. tostring(
 			TARGET_PLACE_ID
 		)
-		.. "/servers/Public?sortOrder=Asc&limit=100"
+		.. "/servers/Public?sortOrder="
+		.. (
+			order
+			or "Asc"
+		)
+		.. "&limit=100"
 
 
 	if cursor then
@@ -5933,20 +6134,13 @@ local function requestServers(
 	end
 
 
-	local ok,
-		body =
-		pcall(function()
-
-			return
-				game:
-					HttpGet(
-						url
-					)
-
-		end)
+	local body =
+		executorHttpGet(
+			url
+		)
 
 
-	if not ok then
+	if not body then
 		return nil
 	end
 
@@ -5980,77 +6174,98 @@ local function getServers()
 		{}
 
 
-	local cursor =
-		nil
+	local seen =
+		{}
 
 
-	for _ = 1, 6 do
+	for _, order in ipairs({
+		"Asc",
+		"Desc"
+	}) do
 
-		local page =
-			requestServers(
-				cursor
-			)
-
-
-		if not page then
-			break
-		end
+		local cursor =
+			nil
 
 
-		for _, server in ipairs(
-			page.data
-			or {}
-		) do
+		for _ = 1, 6 do
 
-			if
-				server.id
+			local page =
+				requestServers(
+					cursor,
+					order
+				)
 
-				and server.id ~= game.JobId
 
-				and not visited[
+			if not page then
+				break
+			end
+
+
+			for _, server in ipairs(
+				page.data
+				or {}
+			) do
+
+				local id =
 					server.id
-				]
 
-				and not failed[
-					server.id
-				]
 
-				and tonumber(
-					server.playing
-				)
+				local playing =
+					tonumber(
+						server.playing
+					)
 
-				and tonumber(
-					server.maxPlayers
-				)
 
-				and tonumber(
-					server.playing
-				)
-					< tonumber(
+				local maxPlayers =
+					tonumber(
 						server.maxPlayers
 					)
-			then
 
-				table.insert(
-					results,
-					server
-				)
+
+				if
+					id
+
+					and id ~= game.JobId
+
+					and not seen[id]
+
+					and not visited[id]
+
+					and not failed[id]
+
+					and playing
+
+					and maxPlayers
+
+					and playing < maxPlayers
+				then
+
+					seen[id] =
+						true
+
+
+					table.insert(
+						results,
+						server
+					)
+
+				end
 
 			end
 
-		end
+
+			cursor =
+				page.nextPageCursor
 
 
-		cursor =
-			page.nextPageCursor
+			if
+				not cursor
+				or #results >= 120
+			then
 
+				break
 
-		if
-			not cursor
-			or #results >= 100
-		then
-
-			break
+			end
 
 		end
 
@@ -6062,15 +6277,86 @@ local function getServers()
 end
 
 
+-- If Roblox tells us a teleport failed,
+-- immediately allow the hopper to try again.
+pcall(function()
+
+	TeleportService.TeleportInitFailed:
+		Connect(function(
+			player,
+			_,
+			_,
+			_,
+			placeId
+		)
+
+			if player ~= LP then
+				return
+			end
+
+
+			if
+				placeId
+				and placeId
+					~= TARGET_PLACE_ID
+			then
+
+				return
+
+			end
+
+
+			if pendingServer then
+
+				failed[
+					pendingServer
+				] =
+					true
+
+			end
+
+
+			pendingServer =
+				nil
+
+
+			hopping =
+				false
+
+
+			HopButton.Text =
+				"HOP"
+
+
+			HopButton.TextSize =
+				24
+
+		end)
+
+end)
+
+
 local function serverHop()
 
 	if hopping then
-		return
+		return false
 	end
 
 
 	hopping =
 		true
+
+
+	hopAttemptToken +=
+		1
+
+
+	local myToken =
+		hopAttemptToken
+
+
+	local oldJobId =
+		game.JobId
 
 
 	HopButton.Text =
@@ -6081,83 +6367,92 @@ local function serverHop()
 		14
 
 
-	task.spawn(function()
-
-		for _ = 1, 12 do
-
-			local servers =
-				getServers()
+	local servers =
+		getServers()
 
 
-			if #servers == 0 then
+	if #servers == 0 then
 
-				visited =
-					{}
+		visited =
+			{}
 
 
-				task.wait(
-					0.1
+		servers =
+			getServers()
+
+	end
+
+
+	if #servers == 0 then
+
+		hopping =
+			false
+
+
+		HopButton.Text =
+			"HOP"
+
+
+		HopButton.TextSize =
+			24
+
+
+		return false
+
+	end
+
+
+	local server =
+		servers[
+			RNG:
+				NextInteger(
+					1,
+					#servers
+				)
+		]
+
+
+	visited[
+		server.id
+	] =
+		true
+
+
+	pendingServer =
+		server.id
+
+
+	HopButton.Text =
+		"HOPPING..."
+
+
+	local success =
+		pcall(function()
+
+			TeleportService:
+				TeleportToPlaceInstance(
+
+					TARGET_PLACE_ID,
+
+					server.id,
+
+					LP
+
 				)
 
-
-				continue
-
-			end
+		end)
 
 
-			local server =
-				servers[
-					RNG:
-						NextInteger(
-							1,
-							#servers
-						)
-				]
+	if not success then
+
+		failed[
+			server.id
+		] =
+			true
 
 
-			visited[
-				server.id
-			] =
-				true
-
-
-			HopButton.Text =
-				"HOPPING..."
-
-
-			local success =
-				pcall(function()
-
-					TeleportService:
-						TeleportToPlaceInstance(
-
-							TARGET_PLACE_ID,
-
-							server.id,
-
-							LP
-
-						)
-
-				end)
-
-
-			if success then
-
-				task.wait(
-					TELEPORT_TIMEOUT
-				)
-
-			else
-
-				failed[
-					server.id
-				] =
-					true
-
-			end
-
-		end
+		pendingServer =
+			nil
 
 
 		hopping =
@@ -6171,15 +6466,79 @@ local function serverHop()
 		HopButton.TextSize =
 			24
 
-	end)
+
+		return false
+
+	end
+
+
+	-- Watchdog:
+	-- if the client is STILL in this JobId after
+	-- TELEPORT_TIMEOUT, treat the hop as failed.
+	task.delay(
+		TELEPORT_TIMEOUT,
+
+		function()
+
+			if
+				myToken
+					~= hopAttemptToken
+			then
+
+				return
+
+			end
+
+
+			if
+				game.JobId
+				== oldJobId
+			then
+
+				if pendingServer then
+
+					failed[
+						pendingServer
+					] =
+						true
+
+				end
+
+
+				pendingServer =
+					nil
+
+
+				hopping =
+					false
+
+
+				HopButton.Text =
+					"HOP"
+
+
+				HopButton.TextSize =
+					24
+
+			end
+
+		end
+	)
+
+
+	return true
 
 end
 
 
 HopButton.MouseButton1Click:
-	Connect(
-		serverHop
-	)
+	Connect(function()
+
+		task.spawn(
+			serverHop
+		)
+
+	end)
 
 
 UserInputService.InputBegan:
@@ -6195,10 +6554,12 @@ UserInputService.InputBegan:
 
 		if
 			input.KeyCode
-			== Enum.KeyCode.Z
+				== Enum.KeyCode.Z
 		then
 
-			serverHop()
+			task.spawn(
+				serverHop
+			)
 
 		end
 
@@ -6206,86 +6567,153 @@ UserInputService.InputBegan:
 
 
 --========================================================
--- MOBILE UI
+-- AUTO HOP
 --========================================================
 
-local function setupMobile()
+task.spawn(function()
 
-	if not UserInputService.TouchEnabled then
-		return
+	while Gui.Parent do
+
+		if autoHopEnabled then
+
+			--========================================
+			-- ALWAYS LET SERVER LOAD FOR >= 2 SEC
+			--========================================
+
+			local remaining =
+				AUTO_HOP_LOAD_WAIT
+
+				- (
+					os.clock()
+					- SCRIPT_STARTED_AT
+				)
+
+
+			if remaining > 0 then
+
+				task.wait(
+					remaining
+				)
+
+			end
+
+
+			-- Run another scan right before deciding.
+			scanMoney()
+
+
+			local found,
+				data =
+				hasGoodBrainrot()
+
+
+			if found then
+
+				--====================================
+				-- FOUND $20M/s+
+				-- STOP AUTO HOP AND SAVE OFF
+				--====================================
+
+				autoHopEnabled =
+					false
+
+
+				Saved.AutoHop =
+					false
+
+
+				refreshButtons()
+
+
+				saveSettings()
+
+
+				print(
+					"[FTX] AUTO HOP STOPPED - FOUND:",
+					data
+					and data.Text
+					or "$20M+/s"
+				)
+
+
+			elseif not hopping then
+
+				--====================================
+				-- NOTHING GOOD FOUND
+				-- TRY ANOTHER SERVER
+				--====================================
+
+				local started =
+					serverHop()
+
+
+				if not started then
+
+					task.wait(
+						TELEPORT_RETRY_DELAY
+					)
+
+				else
+
+					-- If teleport gets stuck,
+					-- serverHop watchdog will set
+					-- hopping=false, then this loop
+					-- automatically calls it again.
+
+					local waitStarted =
+						os.clock()
+
+
+					while
+						Gui.Parent
+
+						and autoHopEnabled
+
+						and hopping
+
+						and os.clock()
+							- waitStarted
+							< TELEPORT_TIMEOUT
+								+ 1
+					do
+
+						task.wait(
+							0.1
+						)
+
+					end
+
+
+					if
+						autoHopEnabled
+
+						and not hopping
+					then
+
+						task.wait(
+							TELEPORT_RETRY_DELAY
+						)
+
+					end
+
+				end
+
+			end
+
+		end
+
+
+		task.wait(
+			AUTO_HOP_RECHECK_RATE
+		)
+
 	end
 
-
-	-- Menus remain 50% as requested.
-	addScale(
-		MainMenu,
-		"FTXMobileScale",
-		MOBILE_MENU_SCALE
-	)
-
-
-	addScale(
-		RadarPanel,
-		"FTXMobileScale",
-		MOBILE_MENU_SCALE
-	)
-
-
-	addScale(
-		BrainrotPanel,
-		"FTXMobileScale",
-		MOBILE_MENU_SCALE
-	)
-
-
-	addScale(
-		Progress,
-		"FTXMobileScale",
-		MOBILE_MENU_SCALE
-	)
-
-
-	-- HOP stays full-size and at top-middle.
-	HopHolder.AnchorPoint =
-		Vector2.new(
-			0.5,
-			0
-		)
-
-
-	HopHolder.Position =
-		UDim2.new(
-			0.5,
-			0,
-			0,
-			26
-		)
-
-
-	-- Opener stays accessible on phone.
-	MainOpen.AnchorPoint =
-		Vector2.new(
-			0,
-			0.5
-		)
-
-
-	MainOpen.Position =
-		UDim2.new(
-			0,
-			8,
-			0.5,
-			0
-		)
-
-end
-
-
-setupMobile()
+end)
 
 
 --========================================================
--- KEEP BRAINROT BEAMS ATTACHED
+-- KEEP BRAINROT LINES ATTACHED
 --========================================================
 
 task.spawn(function()
@@ -6340,6 +6768,85 @@ end)
 
 
 --========================================================
+-- MOBILE
+--========================================================
+
+local function setupMobile()
+
+	if not UserInputService.TouchEnabled then
+		return
+	end
+
+
+	-- Menus 50%.
+	addScale(
+		MainMenu,
+		"FTXMobileScale",
+		MOBILE_MENU_SCALE
+	)
+
+
+	addScale(
+		RadarPanel,
+		"FTXMobileScale",
+		MOBILE_MENU_SCALE
+	)
+
+
+	addScale(
+		BrainrotPanel,
+		"FTXMobileScale",
+		MOBILE_MENU_SCALE
+	)
+
+
+	addScale(
+		Progress,
+		"FTXMobileScale",
+		MOBILE_MENU_SCALE
+	)
+
+
+	-- HOP top-middle.
+	HopHolder.AnchorPoint =
+		Vector2.new(
+			0.5,
+			0
+		)
+
+
+	HopHolder.Position =
+		UDim2.new(
+			0.5,
+			0,
+			0,
+			26
+		)
+
+
+	-- FTX opener remains reachable.
+	MainOpen.AnchorPoint =
+		Vector2.new(
+			0,
+			0.5
+		)
+
+
+	MainOpen.Position =
+		UDim2.new(
+			0,
+			8,
+			0.5,
+			0
+		)
+
+end
+
+
+setupMobile()
+
+
+--========================================================
 -- RESPAWN
 --========================================================
 
@@ -6356,57 +6863,9 @@ LP.CharacterAdded:
 
 
 --========================================================
--- SAVE CURRENT STATE WHEN SCRIPT SHUTS DOWN
+-- PERIODIC SAVE
 --========================================================
 
-game:
-	GetService(
-		"Players"
-	).PlayerRemoving:
-	Connect(function(player)
-
-		if player ~= LP then
-			return
-		end
-
-
-		Saved.MainMenuPosition =
-			positionToTable(
-				MainMenu.Position
-			)
-
-
-		Saved.RadarMenuPosition =
-			positionToTable(
-				RadarPanel.Position
-			)
-
-
-		Saved.BrainrotMenuPosition =
-			positionToTable(
-				BrainrotPanel.Position
-			)
-
-
-		Saved.MainMenuOpen =
-			MainMenu.Visible
-
-
-		Saved.RadarMenuOpen =
-			RadarPanel.Visible
-
-
-		Saved.BrainrotMenuOpen =
-			BrainrotPanel.Visible
-
-
-		saveSettings()
-
-	end)
-
-
--- Also save periodically so even a crash/teleport has
--- a recent copy of positions and preferences.
 task.spawn(function()
 
 	while Gui.Parent do
@@ -6446,6 +6905,30 @@ task.spawn(function()
 			BrainrotPanel.Visible
 
 
+		Saved.NearestSteal =
+			nearestEnabled
+
+
+		Saved.HighestMoney =
+			highestEnabled
+
+
+		Saved.AutoKick =
+			autoKickEnabled
+
+
+		Saved.AutoHop =
+			autoHopEnabled
+
+
+		Saved.RadarCircle =
+			radarCircleEnabled
+
+
+		Saved.PlayerHighlight =
+			playerHighlightEnabled
+
+
 		saveSettings()
 
 	end
@@ -6454,5 +6937,36 @@ end)
 
 
 --========================================================
--- DONE
+-- FINAL
 --========================================================
+
+refreshButtons()
+
+
+print(
+	"[FTX] LOADED"
+)
+
+print(
+	"[FTX] AUTO HOP =",
+	autoHopEnabled
+)
+
+print(
+	"[FTX] AUTO HOP WAIT =",
+	AUTO_HOP_LOAD_WAIT,
+	"seconds"
+)
+
+print(
+	"[FTX] AUTO HOP TARGET = $20M/s+"
+)
+
+print(
+	"[FTX] Failed hops automatically retry"
+)
+
+print(
+	"[FTX] Settings saving =",
+	canSave
+)

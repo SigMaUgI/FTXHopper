@@ -180,7 +180,7 @@ local RESET_FALLBACK =
 
 
 local AUTO_HOP_JOIN_WAIT =
-	2
+	1
 
 
 local AUTO_HOP_LOOP_RATE =

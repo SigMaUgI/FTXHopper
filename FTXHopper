@@ -1,217 +1,5079 @@
 --========================================================
--- LOAD FULL FTX HOPPER
+-- FTX ALL-IN-ONE
+-- FULL SCRIPT
+--========================================================
+-- Auto Hop:
+--   • waits 1 second
+--   • scans for $20M/sec+
+--   • $20M+ = turns Auto Hop OFF
+--   • otherwise hops
+--
+-- Player Join:
+--   • splizz999 button
+--   • 50mia9 button
+--   • Presence API + Roblox fallback
 --========================================================
 
-loadstring(
-	game:HttpGet(
-		"https://raw.githubusercontent.com/SigMaUgI/FTXHopper/refs/heads/main/FTXHopper"
-	)
-)()
+if not game:IsLoaded() then
+	game.Loaded:Wait()
+end
 
 --========================================================
--- FTX QUICK PLAYER JOIN BUTTONS
--- splizz999 + 50mia9
+-- SERVICES
 --========================================================
 
 local Players =
 	game:GetService("Players")
 
+local RunService =
+	game:GetService("RunService")
+
+local TweenService =
+	game:GetService("TweenService")
+
 local TeleportService =
 	game:GetService("TeleportService")
 
+local HttpService =
+	game:GetService("HttpService")
+
+local UserInputService =
+	game:GetService("UserInputService")
+
+local SoundService =
+	game:GetService("SoundService")
+
+local ProximityPromptService =
+	game:GetService("ProximityPromptService")
+
 local CoreGui =
 	game:GetService("CoreGui")
+
 
 local LP =
 	Players.LocalPlayer
 
 
--- Give the main script a moment to create its UI.
-local Gui =
-	CoreGui:WaitForChild(
-		"FTX_AllInOne",
-		10
-	)
+while not LP do
 
-if not Gui then
-	return
-end
+	task.wait()
 
-
---========================================================
--- FIND FTX CONTROLS MENU
---========================================================
-
-local MainMenu = nil
-local Controls = nil
-
-
-for _, object in ipairs(
-	Gui:GetDescendants()
-) do
-
-	if
-		object:IsA("TextButton")
-		and object.Text == "FTX CONTROLS"
-	then
-
-		MainMenu =
-			object.Parent
-
-		break
-
-	end
+	LP =
+		Players.LocalPlayer
 
 end
 
 
-if not MainMenu then
-	return
-end
-
-
-for _, object in ipairs(
-	MainMenu:GetChildren()
-) do
-
-	if
-		object:IsA("ScrollingFrame")
-	then
-
-		Controls =
-			object
-
-		break
-
-	end
-
-end
-
-
-if not Controls then
-	return
-end
-
-
---========================================================
--- FIND A NORMAL FTX BUTTON TO COPY STYLE FROM
---========================================================
-
-local TemplateButton = nil
-
-
-for _, object in ipairs(
-	Controls:GetChildren()
-) do
-
-	if object:IsA("TextButton") then
-
-		TemplateButton =
-			object
-
-		break
-
-	end
-
-end
-
-
-if not TemplateButton then
-	return
-end
-
-
---========================================================
--- CREATE BUTTON
---========================================================
-
-local function createJoinButton(username)
-
-	local old =
-		Controls:FindFirstChild(
-			"FTXJoin_" .. username
-		)
-
-	if old then
-		old:Destroy()
-	end
-
-
-	local button =
-		TemplateButton:Clone()
-
-
-	button.Name =
-		"FTXJoin_" .. username
-
-
-	button.Text =
-		username
-
-
-	button.Visible =
-		true
-
-
-	button.Parent =
-		Controls
-
-
-	return button
-
-end
-
-
-local SplizzButton =
-	createJoinButton(
-		"splizz999"
+local PlayerGui =
+	LP:WaitForChild(
+		"PlayerGui"
 	)
 
 
-local MiaButton =
-	createJoinButton(
-		"50mia9"
-	)
+local RNG =
+	Random.new()
+
+
+local JOIN_TIME =
+	os.clock()
 
 
 --========================================================
--- JOIN PLAYER
+-- SETTINGS
 --========================================================
 
-local joining =
-	false
+local TARGET_PLACE_ID =
+	109983668079237
 
 
-local function joinPlayer(
-	username,
-	button
+local OWNER_NAME =
+	"チキンバナナ"
+
+
+local MIN_MONEY =
+	20_000_000
+
+
+local GREEN_RANGE =
+	30
+
+
+local RED_RANGE =
+	20
+
+
+local AUTO_HOP_JOIN_WAIT =
+	1
+
+
+local MONEY_SCAN_RATE =
+	1
+
+
+local RADAR_RATE =
+	0.15
+
+
+local BRAINROT_LIST_RATE =
+	0.75
+
+
+local STEAL_SCAN_RATE =
+	0.035
+
+
+local MOBILE_MENU_SCALE =
+	0.5
+
+
+local GOOD_SOUND_ID =
+	"rbxassetid://103185549195508"
+
+
+local SAVE_FILE =
+	"FTX_AllInOne_Settings.json"
+
+
+--========================================================
+-- SETTINGS DATA
+--========================================================
+
+local Saved = {
+
+	NearestSteal =
+		false,
+
+	HighestMoney =
+		false,
+
+	AutoKick =
+		true,
+
+	AutoHop =
+		false,
+
+	RadarCircle =
+		true,
+
+	PlayerHighlight =
+		true,
+
+	MainMenuOpen =
+		true,
+
+	RadarMenuOpen =
+		true,
+
+	BrainrotMenuOpen =
+		true,
+
+	MainMenuPosition = {
+
+		XScale = 0,
+		XOffset = 20,
+
+		YScale = 0.5,
+		YOffset = -140
+
+	},
+
+	RadarMenuPosition = {
+
+		XScale = 1,
+		XOffset = -20,
+
+		YScale = 0.5,
+		YOffset = 0
+
+	},
+
+	BrainrotMenuPosition = {
+
+		XScale = 1,
+		XOffset = -275,
+
+		YScale = 0.5,
+		YOffset = 0
+
+	}
+
+}
+
+
+local canSave =
+
+	typeof(writefile) == "function"
+
+	and typeof(readfile) == "function"
+
+	and typeof(isfile) == "function"
+
+
+local function mergeTable(
+	target,
+	source
 )
 
-	if joining then
+	if type(source) ~= "table" then
 		return
 	end
 
 
-	joining =
+	for key, value in pairs(
+		source
+	) do
+
+		if
+			type(value) == "table"
+
+			and type(
+				target[key]
+			) == "table"
+		then
+
+			mergeTable(
+				target[key],
+				value
+			)
+
+		else
+
+			target[key] =
+				value
+
+		end
+
+	end
+
+end
+
+
+local function loadSettings()
+
+	if not canSave then
+		return
+	end
+
+
+	pcall(function()
+
+		if not isfile(
+			SAVE_FILE
+		) then
+			return
+		end
+
+
+		local data =
+			HttpService:
+				JSONDecode(
+					readfile(
+						SAVE_FILE
+					)
+				)
+
+
+		mergeTable(
+			Saved,
+			data
+		)
+
+	end)
+
+end
+
+
+local function saveSettings()
+
+	if not canSave then
+		return
+	end
+
+
+	pcall(function()
+
+		writefile(
+
+			SAVE_FILE,
+
+			HttpService:
+				JSONEncode(
+					Saved
+				)
+
+		)
+
+	end)
+
+end
+
+
+loadSettings()
+
+
+--========================================================
+-- POSITION HELPERS
+--========================================================
+
+local function positionToTable(
+	position
+)
+
+	return {
+
+		XScale =
+			position.X.Scale,
+
+		XOffset =
+			position.X.Offset,
+
+		YScale =
+			position.Y.Scale,
+
+		YOffset =
+			position.Y.Offset
+
+	}
+
+end
+
+
+local function tableToPosition(
+	data,
+	fallback
+)
+
+	if type(data) ~= "table" then
+		return fallback
+	end
+
+
+	return UDim2.new(
+
+		tonumber(
+			data.XScale
+		)
+			or fallback.X.Scale,
+
+		tonumber(
+			data.XOffset
+		)
+			or fallback.X.Offset,
+
+		tonumber(
+			data.YScale
+		)
+			or fallback.Y.Scale,
+
+		tonumber(
+			data.YOffset
+		)
+			or fallback.Y.Offset
+
+	)
+
+end
+
+
+--========================================================
+-- CLEAN OLD SCRIPT
+--========================================================
+
+pcall(function()
+
+	local old =
+		CoreGui:
+			FindFirstChild(
+				"FTX_AllInOne"
+			)
+
+
+	if old then
+
+		old:Destroy()
+
+	end
+
+end)
+
+
+pcall(function()
+
+	local old =
+		workspace:
+			FindFirstChild(
+				"FTX_WORLD"
+			)
+
+
+	if old then
+
+		old:Destroy()
+
+	end
+
+end)
+
+
+--========================================================
+-- GUI
+--========================================================
+
+local Gui =
+	Instance.new(
+		"ScreenGui"
+	)
+
+Gui.Name =
+	"FTX_AllInOne"
+
+Gui.IgnoreGuiInset =
+	true
+
+Gui.ResetOnSpawn =
+	false
+
+Gui.ZIndexBehavior =
+	Enum.ZIndexBehavior.Sibling
+
+Gui.Parent =
+	CoreGui
+
+
+local WorldFolder =
+	Instance.new(
+		"Folder"
+	)
+
+WorldFolder.Name =
+	"FTX_WORLD"
+
+WorldFolder.Parent =
+	workspace
+
+
+local ESPFolder =
+	Instance.new(
+		"Folder"
+	)
+
+ESPFolder.Name =
+	"FTX_ESP"
+
+ESPFolder.Parent =
+	Gui
+
+
+--========================================================
+-- UI HELPERS
+--========================================================
+
+local function corner(
+	parent,
+	radius
+)
+
+	local object =
+		Instance.new(
+			"UICorner"
+		)
+
+	object.CornerRadius =
+		UDim.new(
+			0,
+			radius or 12
+		)
+
+	object.Parent =
+		parent
+
+
+	return object
+
+end
+
+
+local function stroke(
+	parent,
+	thickness,
+	color
+)
+
+	local object =
+		Instance.new(
+			"UIStroke"
+		)
+
+	object.Thickness =
+		thickness or 2
+
+	object.Color =
+		color
+		or Color3.fromRGB(
+			80,
+			80,
+			90
+		)
+
+	object.Parent =
+		parent
+
+
+	return object
+
+end
+
+
+local function addScale(
+	parent,
+	value
+)
+
+	local object =
+		Instance.new(
+			"UIScale"
+		)
+
+	object.Scale =
+		value
+
+	object.Parent =
+		parent
+
+
+	return object
+
+end
+
+
+local function makeDraggable(
+	panel,
+	handle,
+	saveKey
+)
+
+	local dragging =
+		false
+
+	local dragStart =
+		nil
+
+	local panelStart =
+		nil
+
+
+	handle.InputBegan:
+		Connect(function(input)
+
+			if
+				input.UserInputType
+					== Enum.UserInputType.MouseButton1
+
+				or input.UserInputType
+					== Enum.UserInputType.Touch
+			then
+
+				dragging =
+					true
+
+				dragStart =
+					input.Position
+
+				panelStart =
+					panel.Position
+
+			end
+
+		end)
+
+
+	handle.InputEnded:
+		Connect(function(input)
+
+			if
+				input.UserInputType
+					== Enum.UserInputType.MouseButton1
+
+				or input.UserInputType
+					== Enum.UserInputType.Touch
+			then
+
+				if dragging then
+
+					dragging =
+						false
+
+
+					if saveKey then
+
+						Saved[saveKey] =
+							positionToTable(
+								panel.Position
+							)
+
+
+						saveSettings()
+
+					end
+
+				end
+
+			end
+
+		end)
+
+
+	UserInputService.InputChanged:
+		Connect(function(input)
+
+			if not dragging then
+				return
+			end
+
+
+			if
+				input.UserInputType
+					~= Enum.UserInputType.MouseMovement
+
+				and input.UserInputType
+					~= Enum.UserInputType.Touch
+			then
+
+				return
+
+			end
+
+
+			local delta =
+				input.Position
+				- dragStart
+
+
+			panel.Position =
+				UDim2.new(
+
+					panelStart.X.Scale,
+
+					panelStart.X.Offset
+						+ delta.X,
+
+					panelStart.Y.Scale,
+
+					panelStart.Y.Offset
+						+ delta.Y
+
+				)
+
+		end)
+
+end
+
+
+--========================================================
+-- CHARACTER
+--========================================================
+
+local RootAttachment =
+	nil
+
+
+local function getRoot()
+
+	local character =
+		LP.Character
+
+
+	if not character then
+		return nil
+	end
+
+
+	return
+		character:
+			FindFirstChild(
+				"HumanoidRootPart"
+			)
+
+end
+
+
+local function getRootAttachment()
+
+	local root =
+		getRoot()
+
+
+	if not root then
+		return nil
+	end
+
+
+	if
+		RootAttachment
+
+		and RootAttachment.Parent
+			== root
+	then
+
+		return RootAttachment
+
+	end
+
+
+	RootAttachment =
+		root:
+			FindFirstChild(
+				"FTX_ROOT"
+			)
+
+
+	if not RootAttachment then
+
+		RootAttachment =
+			Instance.new(
+				"Attachment"
+			)
+
+
+		RootAttachment.Name =
+			"FTX_ROOT"
+
+
+		RootAttachment.Parent =
+			root
+
+	end
+
+
+	return RootAttachment
+
+end
+
+
+--========================================================
+-- SOUND
+--========================================================
+
+local GoodSound =
+	Instance.new(
+		"Sound"
+	)
+
+GoodSound.Name =
+	"FTX_20M_SOUND"
+
+GoodSound.SoundId =
+	GOOD_SOUND_ID
+
+GoodSound.Volume =
+	2
+
+GoodSound.Parent =
+	SoundService
+
+
+local lastSound =
+	0
+
+
+local function playGoodSound()
+
+	if
+		os.clock()
+			- lastSound
+		< 0.25
+	then
+
+		return
+
+	end
+
+
+	lastSound =
+		os.clock()
+
+
+	pcall(function()
+
+		GoodSound.TimePosition =
+			0
+
+		GoodSound:Play()
+
+	end)
+
+end
+
+
+--========================================================
+-- HOP BUTTON
+--========================================================
+
+local HopHolder =
+	Instance.new(
+		"Frame"
+	)
+
+HopHolder.AnchorPoint =
+	Vector2.new(
+		1,
+		1
+	)
+
+HopHolder.Position =
+	UDim2.new(
+		1,
+		-24,
+		1,
+		-24
+	)
+
+HopHolder.Size =
+	UDim2.new(
+		0,
+		160,
+		0,
+		58
+	)
+
+HopHolder.BackgroundColor3 =
+	Color3.fromRGB(
+		12,
+		12,
+		16
+	)
+
+HopHolder.BorderSizePixel =
+	0
+
+HopHolder.Parent =
+	Gui
+
+
+corner(
+	HopHolder,
+	15
+)
+
+
+local HopOutline =
+	stroke(
+		HopHolder,
+		2,
+		Color3.fromRGB(
+			255,
+			170,
+			25
+		)
+	)
+
+
+local HopButton =
+	Instance.new(
+		"TextButton"
+	)
+
+HopButton.Size =
+	UDim2.fromScale(
+		1,
+		1
+	)
+
+HopButton.BackgroundTransparency =
+	1
+
+HopButton.AutoButtonColor =
+	false
+
+HopButton.Text =
+	"HOP"
+
+HopButton.TextColor3 =
+	Color3.fromRGB(
+		255,
+		220,
+		60
+	)
+
+HopButton.Font =
+	Enum.Font.GothamBlack
+
+HopButton.TextSize =
+	24
+
+HopButton.Parent =
+	HopHolder
+
+
+local HopGradient =
+	Instance.new(
+		"UIGradient"
+	)
+
+HopGradient.Color =
+	ColorSequence.new({
+
+		ColorSequenceKeypoint.new(
+			0,
+			Color3.fromRGB(
+				255,
+				100,
+				0
+			)
+		),
+
+		ColorSequenceKeypoint.new(
+			0.5,
+			Color3.fromRGB(
+				255,
+				235,
+				35
+			)
+		),
+
+		ColorSequenceKeypoint.new(
+			1,
+			Color3.fromRGB(
+				255,
+				115,
+				0
+			)
+		)
+
+	})
+
+HopGradient.Parent =
+	HopOutline
+
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		local tween =
+			TweenService:
+				Create(
+
+					HopGradient,
+
+					TweenInfo.new(
+						2,
+						Enum.EasingStyle.Linear
+					),
+
+					{
+						Rotation =
+							HopGradient.Rotation
+							+ 360
+					}
+
+				)
+
+
+		tween:Play()
+
+		tween.Completed:
+			Wait()
+
+	end
+
+end)
+
+
+--========================================================
+-- MAIN MENU
+--========================================================
+
+local MainMenu =
+	Instance.new(
+		"Frame"
+	)
+
+MainMenu.AnchorPoint =
+	Vector2.new(
+		0,
+		0.5
+	)
+
+MainMenu.Position =
+	tableToPosition(
+
+		Saved.MainMenuPosition,
+
+		UDim2.new(
+			0,
+			20,
+			0.5,
+			-140
+		)
+
+	)
+
+MainMenu.Size =
+	UDim2.new(
+		0,
+		285,
+		0,
+		520
+	)
+
+MainMenu.BackgroundColor3 =
+	Color3.fromRGB(
+		10,
+		10,
+		14
+	)
+
+MainMenu.BorderSizePixel =
+	0
+
+MainMenu.Visible =
+	Saved.MainMenuOpen
+	~= false
+
+MainMenu.Parent =
+	Gui
+
+
+corner(
+	MainMenu,
+	17
+)
+
+
+stroke(
+
+	MainMenu,
+
+	2,
+
+	Color3.fromRGB(
+		255,
+		170,
+		25
+	)
+
+)
+
+
+local MainHeader =
+	Instance.new(
+		"TextButton"
+	)
+
+MainHeader.Size =
+	UDim2.new(
+		1,
+		-50,
+		0,
+		48
+	)
+
+MainHeader.BackgroundTransparency =
+	1
+
+MainHeader.AutoButtonColor =
+	false
+
+MainHeader.Text =
+	"FTX CONTROLS"
+
+MainHeader.TextColor3 =
+	Color3.fromRGB(
+		255,
+		220,
+		60
+	)
+
+MainHeader.Font =
+	Enum.Font.GothamBlack
+
+MainHeader.TextSize =
+	17
+
+MainHeader.Parent =
+	MainMenu
+
+
+local MainClose =
+	Instance.new(
+		"TextButton"
+	)
+
+MainClose.AnchorPoint =
+	Vector2.new(
+		1,
+		0
+	)
+
+MainClose.Position =
+	UDim2.new(
+		1,
+		-8,
+		0,
+		8
+	)
+
+MainClose.Size =
+	UDim2.new(
+		0,
+		34,
+		0,
+		34
+	)
+
+MainClose.BackgroundColor3 =
+	Color3.fromRGB(
+		30,
+		30,
+		36
+	)
+
+MainClose.BorderSizePixel =
+	0
+
+MainClose.Text =
+	"×"
+
+MainClose.TextColor3 =
+	Color3.new(
+		1,
+		1,
+		1
+	)
+
+MainClose.Font =
+	Enum.Font.GothamBlack
+
+MainClose.TextSize =
+	22
+
+MainClose.Parent =
+	MainMenu
+
+
+corner(
+	MainClose,
+	9
+)
+
+
+local MainOpen =
+	Instance.new(
+		"TextButton"
+	)
+
+MainOpen.AnchorPoint =
+	Vector2.new(
+		0,
+		0.5
+	)
+
+MainOpen.Position =
+	UDim2.new(
+		0,
+		12,
+		0.5,
+		0
+	)
+
+MainOpen.Size =
+	UDim2.new(
+		0,
+		52,
+		0,
+		52
+	)
+
+MainOpen.BackgroundColor3 =
+	Color3.fromRGB(
+		15,
+		15,
+		20
+	)
+
+MainOpen.BorderSizePixel =
+	0
+
+MainOpen.Text =
+	"FTX"
+
+MainOpen.TextColor3 =
+	Color3.fromRGB(
+		255,
+		215,
+		50
+	)
+
+MainOpen.Font =
+	Enum.Font.GothamBlack
+
+MainOpen.TextSize =
+	14
+
+MainOpen.Visible =
+	not MainMenu.Visible
+
+MainOpen.Parent =
+	Gui
+
+
+corner(
+	MainOpen,
+	14
+)
+
+
+stroke(
+
+	MainOpen,
+
+	2,
+
+	Color3.fromRGB(
+		255,
+		170,
+		25
+	)
+
+)
+
+
+makeDraggable(
+	MainMenu,
+	MainHeader,
+	"MainMenuPosition"
+)
+
+
+MainClose.MouseButton1Click:
+	Connect(function()
+
+		MainMenu.Visible =
+			false
+
+		MainOpen.Visible =
+			true
+
+		Saved.MainMenuOpen =
+			false
+
+		saveSettings()
+
+	end)
+
+
+MainOpen.MouseButton1Click:
+	Connect(function()
+
+		MainMenu.Visible =
+			true
+
+		MainOpen.Visible =
+			false
+
+		Saved.MainMenuOpen =
+			true
+
+		saveSettings()
+
+	end)
+
+
+--========================================================
+-- CONTROLS LIST
+--========================================================
+
+local ControlsList =
+	Instance.new(
+		"ScrollingFrame"
+	)
+
+ControlsList.Position =
+	UDim2.new(
+		0,
+		10,
+		0,
+		52
+	)
+
+ControlsList.Size =
+	UDim2.new(
+		1,
+		-20,
+		1,
+		-62
+	)
+
+ControlsList.BackgroundTransparency =
+	1
+
+ControlsList.BorderSizePixel =
+	0
+
+ControlsList.ScrollBarThickness =
+	3
+
+ControlsList.AutomaticCanvasSize =
+	Enum.AutomaticSize.Y
+
+ControlsList.CanvasSize =
+	UDim2.new()
+
+ControlsList.Parent =
+	MainMenu
+
+
+local ControlsLayout =
+	Instance.new(
+		"UIListLayout"
+	)
+
+ControlsLayout.Padding =
+	UDim.new(
+		0,
+		8
+	)
+
+ControlsLayout.Parent =
+	ControlsList
+
+
+local function createMenuButton(
+	title
+)
+
+	local button =
+		Instance.new(
+			"TextButton"
+		)
+
+	button.Size =
+		UDim2.new(
+			1,
+			-4,
+			0,
+			46
+		)
+
+	button.BackgroundColor3 =
+		Color3.fromRGB(
+			23,
+			23,
+			28
+		)
+
+	button.BackgroundTransparency =
+		0.04
+
+	button.BorderSizePixel =
+		0
+
+	button.AutoButtonColor =
+		false
+
+	button.Text =
+		title
+
+	button.TextColor3 =
+		Color3.fromRGB(
+			230,
+			230,
+			235
+		)
+
+	button.Font =
+		Enum.Font.GothamBold
+
+	button.TextSize =
+		13
+
+	button.Parent =
+		ControlsList
+
+
+	corner(
+		button,
+		11
+	)
+
+
+	local outline =
+		stroke(
+
+			button,
+
+			1.5,
+
+			Color3.fromRGB(
+				70,
+				70,
+				76
+			)
+
+		)
+
+
+	return
+		button,
+		outline
+
+end
+
+
+local NearestButton,
+	NearestStroke =
+	createMenuButton(
+		"NEAREST STEAL"
+	)
+
+
+local HighestButton,
+	HighestStroke =
+	createMenuButton(
+		"HIGHEST MONEY"
+	)
+
+
+local AutoKickButton,
+	AutoKickStroke =
+	createMenuButton(
+		"AUTO KICK"
+	)
+
+
+local AutoHopButton,
+	AutoHopStroke =
+	createMenuButton(
+		"AUTO HOP"
+	)
+
+
+local SplizzButton,
+	SplizzStroke =
+	createMenuButton(
+		"splizz999"
+	)
+
+
+local MiaButton,
+	MiaStroke =
+	createMenuButton(
+		"50mia9"
+	)
+
+
+local RadarCircleButton,
+	RadarCircleStroke =
+	createMenuButton(
+		"RADAR CIRCLE"
+	)
+
+
+local PlayerHighlightButton,
+	PlayerHighlightStroke =
+	createMenuButton(
+		"PLAYER HIGHLIGHT"
+	)
+
+
+local RadarMenuButton,
+	RadarMenuStroke =
+	createMenuButton(
+		"RADAR MENU"
+	)
+
+
+local BrainrotMenuButton,
+	BrainrotMenuStroke =
+	createMenuButton(
+		"BRAINROT MENU"
+	)
+
+
+--========================================================
+-- STATE
+--========================================================
+
+local nearestEnabled =
+	Saved.NearestSteal
+	== true
+
+
+local highestEnabled =
+	Saved.HighestMoney
+	== true
+
+
+if
+	nearestEnabled
+	and highestEnabled
+then
+
+	highestEnabled =
+		false
+
+end
+
+
+local autoKickEnabled =
+	Saved.AutoKick
+	~= false
+
+
+local autoHopEnabled =
+	Saved.AutoHop
+	== true
+
+
+local radarCircleEnabled =
+	Saved.RadarCircle
+	~= false
+
+
+local playerHighlightEnabled =
+	Saved.PlayerHighlight
+	~= false
+
+
+--========================================================
+-- TOGGLE STYLE
+--========================================================
+
+local function updateToggle(
+	button,
+	outline,
+	title,
+	state
+)
+
+	if state then
+
+		button.Text =
+			title
+			.. "   •   ON"
+
+
+		button.TextColor3 =
+			Color3.fromRGB(
+				255,
+				222,
+				65
+			)
+
+
+		outline.Color =
+			Color3.fromRGB(
+				255,
+				174,
+				28
+			)
+
+
+		outline.Thickness =
+			2
+
+	else
+
+		button.Text =
+			title
+			.. "   •   OFF"
+
+
+		button.TextColor3 =
+			Color3.fromRGB(
+				155,
+				155,
+				165
+			)
+
+
+		outline.Color =
+			Color3.fromRGB(
+				65,
+				65,
+				72
+			)
+
+
+		outline.Thickness =
+			1.5
+
+	end
+
+end
+
+
+--========================================================
+-- MONEY
+--========================================================
+
+local function parseMoney(text)
+
+	if typeof(text) ~= "string" then
+		return nil
+	end
+
+
+	local clean =
+		text:
+			upper():
+			gsub(
+				",",
+				""
+			):
+			gsub(
+				"^%s+",
+				""
+			):
+			gsub(
+				"%s+$",
+				""
+			)
+
+
+	local number,
+		suffix =
+		clean:
+			match(
+				"^%$([%d%.]+)([KMBTQ]?)%s*/%s*S$"
+			)
+
+
+	if not number then
+
+		number,
+			suffix =
+			clean:
+				match(
+					"^%$([%d%.]+)([KMBTQ]?)%s*/%s*SEC$"
+				)
+
+	end
+
+
+	if not number then
+
+		number,
+			suffix =
+			clean:
+				match(
+					"^%$([%d%.]+)([KMBTQ]?)%s*PER%s*SEC$"
+				)
+
+	end
+
+
+	if not number then
+		return nil
+	end
+
+
+	number =
+		tonumber(
+			number
+		)
+
+
+	if not number then
+		return nil
+	end
+
+
+	local multiplier =
+		1
+
+
+	if suffix == "K" then
+
+		multiplier =
+			1e3
+
+	elseif suffix == "M" then
+
+		multiplier =
+			1e6
+
+	elseif suffix == "B" then
+
+		multiplier =
+			1e9
+
+	elseif suffix == "T" then
+
+		multiplier =
+			1e12
+
+	elseif suffix == "Q" then
+
+		multiplier =
+			1e15
+
+	end
+
+
+	return
+		number
+		* multiplier
+
+end
+
+
+--========================================================
+-- WORLD PART
+--========================================================
+
+local function getWorldPart(
+	object
+)
+
+	local current =
+		object
+
+
+	for _ = 1, 20 do
+
+		if not current then
+			break
+		end
+
+
+		if
+			current:IsA(
+				"BillboardGui"
+			)
+
+			or current:IsA(
+				"SurfaceGui"
+			)
+		then
+
+			local adornee =
+				current.Adornee
+
+
+			if adornee then
+
+				if adornee:IsA(
+					"BasePart"
+				) then
+
+					return adornee
+
+				end
+
+
+				if
+					adornee:IsA(
+						"Attachment"
+					)
+
+					and adornee.Parent
+
+					and adornee.Parent:IsA(
+						"BasePart"
+					)
+				then
+
+					return
+						adornee.Parent
+
+				end
+
+			end
+
+		end
+
+
+		if current:IsA(
+			"BasePart"
+		) then
+
+			return current
+
+		end
+
+
+		if current:IsA(
+			"Model"
+		) then
+
+			return
+
+				current.PrimaryPart
+
+				or current:
+					FindFirstChildWhichIsA(
+						"BasePart",
+						true
+					)
+
+		end
+
+
+		current =
+			current.Parent
+
+	end
+
+
+	return nil
+
+end
+
+
+--========================================================
+-- BRAINROT NAME
+--========================================================
+
+local BLOCKED_NAMES = {
+
+	["SECRET"] = true,
+	["GOLD"] = true,
+	["DIAMOND"] = true,
+	["RADIOACTIVE"] = true,
+	["STOLEN"] = true,
+	["STEAL"] = true,
+	["COMMON"] = true,
+	["RARE"] = true,
+	["EPIC"] = true,
+	["LEGENDARY"] = true,
+	["MYTHIC"] = true,
+	["COLLECT"] = true,
+	["OFFLINE CASH"] = true
+
+}
+
+
+local function findBrainrotName(
+	label
+)
+
+	local gui =
+
+		label:
+			FindFirstAncestorWhichIsA(
+				"BillboardGui"
+			)
+
+		or
+
+		label:
+			FindFirstAncestorWhichIsA(
+				"SurfaceGui"
+			)
+
+
+	if not gui then
+		return "UNKNOWN"
+	end
+
+
+	for _, object in ipairs(
+		gui:GetDescendants()
+	) do
+
+		if
+			object ~= label
+
+			and (
+				object:IsA(
+					"TextLabel"
+				)
+
+				or object:IsA(
+					"TextButton"
+				)
+			)
+		then
+
+			local text =
+				tostring(
+					object.Text
+					or ""
+				)
+
+
+			local upper =
+				text:upper()
+
+
+			if
+				#text >= 2
+
+				and #text <= 60
+
+				and not parseMoney(
+					text
+				)
+
+				and not BLOCKED_NAMES[
+					upper
+				]
+			then
+
+				return text
+
+			end
+
+		end
+
+	end
+
+
+	return "UNKNOWN"
+
+end
+
+
+--========================================================
+-- MONEY TARGETS
+--========================================================
+
+local MoneyTargets =
+	{}
+
+
+local WatchedMoney =
+	{}
+
+
+local BrainrotESP =
+	{}
+
+
+local announced =
+	{}
+
+
+local function hasGoodBrainrot()
+
+	for label, data in pairs(
+		MoneyTargets
+	) do
+
+		if
+			label
+			and label.Parent
+
+			and data
+			and data.Value
+
+			and data.Value
+				>= MIN_MONEY
+
+			and data.Part
+			and data.Part.Parent
+		then
+
+			return
+				true,
+				data,
+				label
+
+		end
+
+	end
+
+
+	return
+		false,
+		nil,
+		nil
+
+end
+
+
+local function removeBrainrotESP(
+	label
+)
+
+	local data =
+		BrainrotESP[
+			label
+		]
+
+
+	if data then
+
+		if data.Gui then
+			data.Gui:Destroy()
+		end
+
+
+		if data.Beam then
+			data.Beam:Destroy()
+		end
+
+
+		if data.Attachment then
+			data.Attachment:Destroy()
+		end
+
+	end
+
+
+	BrainrotESP[
+		label
+	] =
+		nil
+
+end
+
+
+local function createBrainrotESP(
+	label,
+	data
+)
+
+	if BrainrotESP[
+		label
+	] then
+		return
+	end
+
+
+	local billboard =
+		Instance.new(
+			"BillboardGui"
+		)
+
+	billboard.Adornee =
+		data.Part
+
+	billboard.AlwaysOnTop =
+		true
+
+	billboard.LightInfluence =
+		0
+
+	billboard.MaxDistance =
+		100000
+
+	billboard.Size =
+		UDim2.new(
+			0,
+			390,
+			0,
+			115
+		)
+
+	billboard.StudsOffset =
+		Vector3.new(
+			0,
+			6,
+			0
+		)
+
+	billboard.Parent =
+		ESPFolder
+
+
+	local text =
+		Instance.new(
+			"TextLabel"
+		)
+
+	text.Size =
+		UDim2.fromScale(
+			1,
+			1
+		)
+
+	text.BackgroundTransparency =
+		1
+
+	text.TextColor3 =
+		Color3.fromRGB(
+			55,
+			255,
+			90
+		)
+
+	text.TextTransparency =
+		0.65
+
+	text.TextStrokeTransparency =
+		0.65
+
+	text.Font =
+		Enum.Font.GothamBlack
+
+	text.TextScaled =
+		true
+
+	text.Text =
+		tostring(
+			data.Name
+		)
+		.. "\n"
+		.. tostring(
+			data.Text
+		)
+
+	text.Parent =
+		billboard
+
+
+	local attachment =
+		Instance.new(
+			"Attachment"
+		)
+
+	attachment.Parent =
+		data.Part
+
+
+	local beam =
+		Instance.new(
+			"Beam"
+		)
+
+	beam.Attachment0 =
+		getRootAttachment()
+
+	beam.Attachment1 =
+		attachment
+
+	beam.FaceCamera =
+		true
+
+	beam.Width0 =
+		0.14
+
+	beam.Width1 =
+		0.14
+
+	beam.Color =
+		ColorSequence.new(
+			Color3.fromRGB(
+				40,
+				255,
+				70
+			)
+		)
+
+	beam.Parent =
+		WorldFolder
+
+
+	BrainrotESP[
+		label
+	] = {
+
+		Gui =
+			billboard,
+
+		Label =
+			text,
+
+		Beam =
+			beam,
+
+		Attachment =
+			attachment
+
+	}
+
+end
+
+
+local refreshButtons
+
+
+local function stopAutoHop()
+
+	autoHopEnabled =
+		false
+
+	Saved.AutoHop =
+		false
+
+
+	if refreshButtons then
+
+		refreshButtons()
+
+	end
+
+
+	saveSettings()
+
+end
+
+
+local function checkMoney(
+	object
+)
+
+	if
+		not object
+		or not object.Parent
+	then
+
+		return
+
+	end
+
+
+	local value =
+		parseMoney(
+			object.Text
+		)
+
+
+	if not value then
+
+		MoneyTargets[
+			object
+		] =
+			nil
+
+		announced[
+			object
+		] =
+			nil
+
+
+		removeBrainrotESP(
+			object
+		)
+
+
+		return
+
+	end
+
+
+	local part =
+		getWorldPart(
+			object
+		)
+
+
+	if not part then
+		return
+	end
+
+
+	local data = {
+
+		Value =
+			value,
+
+		Part =
+			part,
+
+		Name =
+			findBrainrotName(
+				object
+			),
+
+		Text =
+			tostring(
+				object.Text
+			)
+
+	}
+
+
+	MoneyTargets[
+		object
+	] =
+		data
+
+
+	if value >= MIN_MONEY then
+
+		if not announced[
+			object
+		] then
+
+			announced[
+				object
+			] =
+				true
+
+
+			playGoodSound()
+
+		end
+
+
+		if not BrainrotESP[
+			object
+		] then
+
+			createBrainrotESP(
+				object,
+				data
+			)
+
+		else
+
+			BrainrotESP[
+				object
+			].Label.Text =
+				data.Name
+				.. "\n"
+				.. data.Text
+
+		end
+
+
+		if autoHopEnabled then
+
+			stopAutoHop()
+
+		end
+
+	else
+
+		announced[
+			object
+		] =
+			nil
+
+
+		removeBrainrotESP(
+			object
+		)
+
+	end
+
+end
+
+
+local function watchMoney(
+	object
+)
+
+	if WatchedMoney[
+		object
+	] then
+
+		return
+
+	end
+
+
+	if
+		not object:IsA(
+			"TextLabel"
+		)
+
+		and not object:IsA(
+			"TextButton"
+		)
+	then
+
+		return
+
+	end
+
+
+	WatchedMoney[
+		object
+	] =
 		true
 
 
-	local originalText =
-		username
+	checkMoney(
+		object
+	)
 
 
-	button.Text =
-		"FINDING..."
+	object:
+		GetPropertyChangedSignal(
+			"Text"
+		):
+		Connect(function()
+
+			checkMoney(
+				object
+			)
+
+		end)
+
+end
 
 
-	--====================================================
-	-- USER ID
-	--====================================================
+local function scanMoney()
 
-	local userId = nil
+	for index, object in ipairs(
+		workspace:
+			GetDescendants()
+	) do
+
+		if
+			object:IsA(
+				"TextLabel"
+			)
+
+			or object:IsA(
+				"TextButton"
+			)
+		then
+
+			watchMoney(
+				object
+			)
 
 
-	local gotId =
+			checkMoney(
+				object
+			)
+
+		end
+
+
+		if
+			index % 500
+			== 0
+		then
+
+			task.wait()
+
+		end
+
+	end
+
+end
+
+
+task.spawn(
+	scanMoney
+)
+
+
+workspace.DescendantAdded:
+	Connect(
+		watchMoney
+	)
+
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		task.wait(
+			MONEY_SCAN_RATE
+		)
+
+
+		scanMoney()
+
+	end
+
+end)
+
+
+--========================================================
+-- PROGRESS BAR
+--========================================================
+
+local Progress =
+	Instance.new(
+		"Frame"
+	)
+
+Progress.AnchorPoint =
+	Vector2.new(
+		0.5,
+		0
+	)
+
+Progress.Position =
+	UDim2.new(
+		0.5,
+		0,
+		0,
+		32
+	)
+
+Progress.Size =
+	UDim2.new(
+		0,
+		420,
+		0,
+		64
+	)
+
+Progress.BackgroundColor3 =
+	Color3.fromRGB(
+		10,
+		10,
+		14
+	)
+
+Progress.BorderSizePixel =
+	0
+
+Progress.Visible =
+	false
+
+Progress.Parent =
+	Gui
+
+
+corner(
+	Progress,
+	15
+)
+
+
+stroke(
+
+	Progress,
+
+	2,
+
+	Color3.fromRGB(
+		255,
+		160,
+		20
+	)
+
+)
+
+
+local ProgressText =
+	Instance.new(
+		"TextLabel"
+	)
+
+ProgressText.Position =
+	UDim2.new(
+		0,
+		12,
+		0,
+		5
+	)
+
+ProgressText.Size =
+	UDim2.new(
+		1,
+		-24,
+		0,
+		23
+	)
+
+ProgressText.BackgroundTransparency =
+	1
+
+ProgressText.Text =
+	"STEALING"
+
+ProgressText.TextColor3 =
+	Color3.new(
+		1,
+		1,
+		1
+	)
+
+ProgressText.Font =
+	Enum.Font.GothamBold
+
+ProgressText.TextSize =
+	14
+
+ProgressText.Parent =
+	Progress
+
+
+local ProgressTrack =
+	Instance.new(
+		"Frame"
+	)
+
+ProgressTrack.Position =
+	UDim2.new(
+		0,
+		12,
+		0,
+		34
+	)
+
+ProgressTrack.Size =
+	UDim2.new(
+		1,
+		-24,
+		0,
+		16
+	)
+
+ProgressTrack.BackgroundColor3 =
+	Color3.fromRGB(
+		31,
+		31,
+		37
+	)
+
+ProgressTrack.BorderSizePixel =
+	0
+
+ProgressTrack.ClipsDescendants =
+	true
+
+ProgressTrack.Parent =
+	Progress
+
+
+corner(
+	ProgressTrack,
+	8
+)
+
+
+local ProgressFill =
+	Instance.new(
+		"Frame"
+	)
+
+ProgressFill.Size =
+	UDim2.new(
+		0,
+		0,
+		1,
+		0
+	)
+
+ProgressFill.BackgroundColor3 =
+	Color3.new(
+		1,
+		1,
+		1
+	)
+
+ProgressFill.BorderSizePixel =
+	0
+
+ProgressFill.Parent =
+	Progress
+
+
+corner(
+	ProgressFill,
+	8
+)
+
+
+local ProgressGradient =
+	Instance.new(
+		"UIGradient"
+	)
+
+ProgressGradient.Color =
+	ColorSequence.new({
+
+		ColorSequenceKeypoint.new(
+			0,
+			Color3.fromRGB(
+				255,
+				110,
+				0
+			)
+		),
+
+		ColorSequenceKeypoint.new(
+			0.5,
+			Color3.fromRGB(
+				255,
+				230,
+				35
+			)
+		),
+
+		ColorSequenceKeypoint.new(
+			1,
+			Color3.fromRGB(
+				255,
+				125,
+				0
+			)
+		)
+
+	})
+
+ProgressGradient.Parent =
+	ProgressFill
+
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		TweenService:
+			Create(
+
+				ProgressGradient,
+
+				TweenInfo.new(
+					0.75,
+					Enum.EasingStyle.Linear
+				),
+
+				{
+					Offset =
+						Vector2.new(
+							1,
+							0
+						)
+				}
+
+			):
+			Play()
+
+
+		task.wait(
+			0.75
+		)
+
+
+		ProgressGradient.Offset =
+			Vector2.new(
+				-1,
+				0
+			)
+
+	end
+
+end)
+
+
+--========================================================
+-- STEAL PROMPTS
+--========================================================
+
+local Prompts =
+	{}
+
+
+local function addPrompt(
+	object
+)
+
+	if object:IsA(
+		"ProximityPrompt"
+	) then
+
+		Prompts[
+			object
+		] =
+			true
+
+	end
+
+end
+
+
+for _, object in ipairs(
+	workspace:
+		GetDescendants()
+) do
+
+	addPrompt(
+		object
+	)
+
+end
+
+
+workspace.DescendantAdded:
+	Connect(
+		addPrompt
+	)
+
+
+workspace.DescendantRemoving:
+	Connect(function(object)
+
+	Prompts[
+		object
+	] =
+		nil
+
+end)
+
+
+local function isStealPrompt(
+	prompt
+)
+
+	if
+		not prompt
+		or not prompt.Parent
+		or not prompt.Enabled
+	then
+
+		return false
+
+	end
+
+
+	local a =
+		tostring(
+			prompt.ActionText
+			or ""
+		):
+			lower()
+
+
+	local b =
+		tostring(
+			prompt.ObjectText
+			or ""
+		):
+			lower()
+
+
+	return
+
+		a:find(
+			"steal",
+			1,
+			true
+		)
+
+		or b:find(
+			"steal",
+			1,
+			true
+		)
+
+end
+
+
+local function promptPosition(
+	prompt
+)
+
+	if
+		not prompt
+		or not prompt.Parent
+	then
+
+		return nil
+
+	end
+
+
+	if prompt.Parent:IsA(
+		"Attachment"
+	) then
+
+		return
+			prompt.Parent.WorldPosition
+
+	end
+
+
+	if prompt.Parent:IsA(
+		"BasePart"
+	) then
+
+		return
+			prompt.Parent.Position
+
+	end
+
+
+	local model =
+		prompt.Parent:
+			FindFirstAncestorWhichIsA(
+				"Model"
+			)
+
+
+	if model then
+
+		local part =
+
+			model.PrimaryPart
+
+			or model:
+				FindFirstChildWhichIsA(
+					"BasePart",
+					true
+				)
+
+
+		if part then
+
+			return
+				part.Position
+
+		end
+
+	end
+
+
+	return nil
+
+end
+
+
+local function promptDistance(
+	prompt
+)
+
+	local root =
+		getRoot()
+
+
+	local pos =
+		promptPosition(
+			prompt
+		)
+
+
+	if
+		not root
+		or not pos
+	then
+
+		return
+			math.huge
+
+	end
+
+
+	return
+		(
+			root.Position
+			- pos
+		).Magnitude
+
+end
+
+
+local function getNearestPrompt()
+
+	local best =
+		nil
+
+	local bestDistance =
+		math.huge
+
+
+	for prompt in pairs(
+		Prompts
+	) do
+
+		if isStealPrompt(
+			prompt
+		) then
+
+			local distance =
+				promptDistance(
+					prompt
+				)
+
+
+			local maximum =
+				tonumber(
+					prompt.MaxActivationDistance
+				)
+				or 10
+
+
+			if
+				distance
+					<= maximum + 0.75
+
+				and distance
+					< bestDistance
+			then
+
+				best =
+					prompt
+
+				bestDistance =
+					distance
+
+			end
+
+		end
+
+	end
+
+
+	return best
+
+end
+
+
+local function getPromptMoney(
+	prompt
+)
+
+	local pos =
+		promptPosition(
+			prompt
+		)
+
+
+	if not pos then
+		return nil
+	end
+
+
+	local bestDistance =
+		math.huge
+
+	local money =
+		nil
+
+
+	for _, data in pairs(
+		MoneyTargets
+	) do
+
+		if
+			data.Part
+			and data.Part.Parent
+		then
+
+			local distance =
+				(
+					data.Part.Position
+					- pos
+				).Magnitude
+
+
+			if
+				distance
+					< bestDistance
+
+				and distance
+					<= 25
+			then
+
+				bestDistance =
+					distance
+
+				money =
+					data.Value
+
+			end
+
+		end
+
+	end
+
+
+	return money
+
+end
+
+
+local function getHighestPrompt()
+
+	local best =
+		nil
+
+	local bestMoney =
+		-math.huge
+
+
+	for prompt in pairs(
+		Prompts
+	) do
+
+		if isStealPrompt(
+			prompt
+		) then
+
+			local distance =
+				promptDistance(
+					prompt
+				)
+
+
+			local maximum =
+				tonumber(
+					prompt.MaxActivationDistance
+				)
+				or 10
+
+
+			if
+				distance
+					<= maximum + 0.75
+			then
+
+				local money =
+					getPromptMoney(
+						prompt
+					)
+
+
+				if
+					money
+					and money
+						> bestMoney
+				then
+
+					bestMoney =
+						money
+
+					best =
+						prompt
+
+				end
+
+			end
+
+		end
+
+	end
+
+
+	return best
+
+end
+
+
+local stealing =
+	false
+
+
+local currentPrompt =
+	nil
+
+
+local function holdPrompt(
+	prompt
+)
+
+	if
+		stealing
+		or not prompt
+		or not prompt.Parent
+	then
+
+		return
+
+	end
+
+
+	stealing =
+		true
+
+	currentPrompt =
+		prompt
+
+
+	local duration =
+		math.max(
+			tonumber(
+				prompt.HoldDuration
+			)
+				or 0,
+			0.05
+		)
+
+
+	Progress.Visible =
+		true
+
+
+	ProgressText.Text =
+		"STEALING  "
+		.. tostring(
+			prompt.ObjectText
+			or ""
+		)
+
+
+	ProgressFill.Size =
+		UDim2.new(
+			0,
+			0,
+			1,
+			0
+		)
+
+
+	local tween =
+		TweenService:
+			Create(
+
+				ProgressFill,
+
+				TweenInfo.new(
+					duration,
+					Enum.EasingStyle.Linear
+				),
+
+				{
+					Size =
+						UDim2.new(
+							1,
+							0,
+							1,
+							0
+						)
+				}
+
+			)
+
+
+	pcall(function()
+
+		prompt:
+			InputHoldBegin()
+
+	end)
+
+
+	tween:Play()
+
+
+	task.wait(
+		duration + 0.04
+	)
+
+
+	pcall(function()
+
+		prompt:
+			InputHoldEnd()
+
+	end)
+
+
+	Progress.Visible =
+		false
+
+
+	currentPrompt =
+		nil
+
+	stealing =
+		false
+
+end
+
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		if not stealing then
+
+			local prompt =
+				nil
+
+
+			if nearestEnabled then
+
+				prompt =
+					getNearestPrompt()
+
+			elseif highestEnabled then
+
+				prompt =
+					getHighestPrompt()
+
+			end
+
+
+			if prompt then
+
+				task.spawn(
+					holdPrompt,
+					prompt
+				)
+
+			end
+
+		end
+
+
+		task.wait(
+			STEAL_SCAN_RATE
+		)
+
+	end
+
+end)
+
+
+--========================================================
+-- AUTO KICK
+--========================================================
+
+local watchedUI =
+	{}
+
+
+local kickTriggered =
+	false
+
+
+local function checkYouStole(
+	text
+)
+
+	if
+		not autoKickEnabled
+		or kickTriggered
+	then
+
+		return
+
+	end
+
+
+	if typeof(text) ~= "string" then
+		return
+	end
+
+
+	if
+		text:
+			lower():
+			find(
+				"you stole",
+				1,
+				true
+			)
+	then
+
+		kickTriggered =
+			true
+
+
+		LP:Kick(
+			"FTX on top"
+		)
+
+	end
+
+end
+
+
+local function watchUI(
+	object
+)
+
+	if watchedUI[
+		object
+	] then
+
+		return
+
+	end
+
+
+	if
+		not object:IsA(
+			"TextLabel"
+		)
+
+		and not object:IsA(
+			"TextButton"
+		)
+	then
+
+		return
+
+	end
+
+
+	watchedUI[
+		object
+	] =
+		true
+
+
+	checkYouStole(
+		object.Text
+	)
+
+
+	object:
+		GetPropertyChangedSignal(
+			"Text"
+		):
+		Connect(function()
+
+			checkYouStole(
+				object.Text
+			)
+
+		end)
+
+end
+
+
+for _, object in ipairs(
+	PlayerGui:
+		GetDescendants()
+) do
+
+	watchUI(
+		object
+	)
+
+end
+
+
+PlayerGui.DescendantAdded:
+	Connect(
+		watchUI
+	)
+
+
+--========================================================
+-- PLAYER ESP + RADAR
+--========================================================
+
+local PlayerESP =
+	{}
+
+
+local RadarPanel =
+	Instance.new(
+		"Frame"
+	)
+
+RadarPanel.AnchorPoint =
+	Vector2.new(
+		1,
+		0.5
+	)
+
+RadarPanel.Position =
+	tableToPosition(
+
+		Saved.RadarMenuPosition,
+
+		UDim2.new(
+			1,
+			-20,
+			0.5,
+			0
+		)
+
+	)
+
+RadarPanel.Size =
+	UDim2.new(
+		0,
+		245,
+		0,
+		320
+	)
+
+RadarPanel.BackgroundColor3 =
+	Color3.fromRGB(
+		12,
+		12,
+		16
+	)
+
+RadarPanel.BorderSizePixel =
+	0
+
+RadarPanel.Visible =
+	Saved.RadarMenuOpen
+	~= false
+
+RadarPanel.Parent =
+	Gui
+
+
+corner(
+	RadarPanel,
+	16
+)
+
+
+stroke(
+
+	RadarPanel,
+
+	2,
+
+	Color3.fromRGB(
+		200,
+		200,
+		210
+	)
+
+)
+
+
+local RadarTitle =
+	Instance.new(
+		"TextButton"
+	)
+
+RadarTitle.Size =
+	UDim2.new(
+		1,
+		-46,
+		0,
+		42
+	)
+
+RadarTitle.BackgroundTransparency =
+	1
+
+RadarTitle.AutoButtonColor =
+	false
+
+RadarTitle.Text =
+	"RADAR"
+
+RadarTitle.TextColor3 =
+	Color3.fromRGB(
+		230,
+		230,
+		230
+	)
+
+RadarTitle.Font =
+	Enum.Font.GothamBlack
+
+RadarTitle.TextSize =
+	15
+
+RadarTitle.Parent =
+	RadarPanel
+
+
+local RadarClose =
+	Instance.new(
+		"TextButton"
+	)
+
+RadarClose.AnchorPoint =
+	Vector2.new(
+		1,
+		0
+	)
+
+RadarClose.Position =
+	UDim2.new(
+		1,
+		-7,
+		0,
+		6
+	)
+
+RadarClose.Size =
+	UDim2.new(
+		0,
+		34,
+		0,
+		30
+	)
+
+RadarClose.BackgroundColor3 =
+	Color3.fromRGB(
+		30,
+		30,
+		35
+	)
+
+RadarClose.BorderSizePixel =
+	0
+
+RadarClose.Text =
+	"×"
+
+RadarClose.TextColor3 =
+	Color3.new(
+		1,
+		1,
+		1
+	)
+
+RadarClose.Font =
+	Enum.Font.GothamBlack
+
+RadarClose.TextSize =
+	20
+
+RadarClose.Parent =
+	RadarPanel
+
+
+corner(
+	RadarClose,
+	8
+)
+
+
+local RadarList =
+	Instance.new(
+		"ScrollingFrame"
+	)
+
+RadarList.Position =
+	UDim2.new(
+		0,
+		8,
+		0,
+		44
+	)
+
+RadarList.Size =
+	UDim2.new(
+		1,
+		-16,
+		1,
+		-52
+	)
+
+RadarList.BackgroundTransparency =
+	1
+
+RadarList.BorderSizePixel =
+	0
+
+RadarList.AutomaticCanvasSize =
+	Enum.AutomaticSize.Y
+
+RadarList.CanvasSize =
+	UDim2.new()
+
+RadarList.ScrollBarThickness =
+	3
+
+RadarList.Parent =
+	RadarPanel
+
+
+local RadarLayout =
+	Instance.new(
+		"UIListLayout"
+	)
+
+RadarLayout.Padding =
+	UDim.new(
+		0,
+		5
+	)
+
+RadarLayout.Parent =
+	RadarList
+
+
+makeDraggable(
+	RadarPanel,
+	RadarTitle,
+	"RadarMenuPosition"
+)
+
+
+RadarClose.MouseButton1Click:
+	Connect(function()
+
+		RadarPanel.Visible =
+			false
+
+		Saved.RadarMenuOpen =
+			false
+
+		saveSettings()
+
+		if refreshButtons then
+			refreshButtons()
+		end
+
+	end)
+
+
+local RadarCircle =
+	Instance.new(
+		"Part"
+	)
+
+RadarCircle.Name =
+	"FTX_RADAR_CIRCLE"
+
+RadarCircle.Shape =
+	Enum.PartType.Cylinder
+
+RadarCircle.Size =
+	Vector3.new(
+		0.05,
+		GREEN_RANGE * 2,
+		GREEN_RANGE * 2
+	)
+
+RadarCircle.Anchored =
+	true
+
+RadarCircle.CanCollide =
+	false
+
+RadarCircle.CanQuery =
+	false
+
+RadarCircle.CanTouch =
+	false
+
+RadarCircle.CastShadow =
+	false
+
+RadarCircle.Material =
+	Enum.Material.SmoothPlastic
+
+RadarCircle.Color =
+	Color3.new(
+		1,
+		1,
+		1
+	)
+
+RadarCircle.Transparency =
+	radarCircleEnabled
+	and 0.7
+	or 1
+
+RadarCircle.Parent =
+	WorldFolder
+
+
+local function setupPlayer(
+	player
+)
+
+	if player == LP then
+		return
+	end
+
+
+	if PlayerESP[
+		player
+	] then
+
+		return
+
+	end
+
+
+	PlayerESP[
+		player
+	] =
+		{}
+
+
+	local data =
+		PlayerESP[
+			player
+		]
+
+
+	local function onCharacter(
+		character
+	)
+
+		if data.Highlight then
+			data.Highlight:Destroy()
+		end
+
+
+		if data.Billboard then
+			data.Billboard:Destroy()
+		end
+
+
+		local head =
+			character:
+				WaitForChild(
+					"Head",
+					5
+				)
+
+
+		if not head then
+			return
+		end
+
+
+		local billboard =
+			Instance.new(
+				"BillboardGui"
+			)
+
+		billboard.Adornee =
+			head
+
+		billboard.AlwaysOnTop =
+			true
+
+		billboard.MaxDistance =
+			100000
+
+		billboard.Size =
+			UDim2.new(
+				0,
+				300,
+				0,
+				65
+			)
+
+		billboard.StudsOffset =
+			Vector3.new(
+				0,
+				3.5,
+				0
+			)
+
+		billboard.Parent =
+			Gui
+
+
+		local label =
+			Instance.new(
+				"TextLabel"
+			)
+
+		label.Size =
+			UDim2.fromScale(
+				1,
+				1
+			)
+
+		label.BackgroundTransparency =
+			1
+
+		label.Text =
+			player.Name
+
+		label.TextColor3 =
+			Color3.new(
+				1,
+				1,
+				1
+			)
+
+		label.TextStrokeTransparency =
+			0.1
+
+		label.Font =
+			Enum.Font.GothamBlack
+
+		label.TextScaled =
+			true
+
+		label.Parent =
+			billboard
+
+
+		local highlight =
+			Instance.new(
+				"Highlight"
+			)
+
+		highlight.Adornee =
+			character
+
+		highlight.DepthMode =
+			Enum.HighlightDepthMode.AlwaysOnTop
+
+		highlight.FillTransparency =
+			0.2
+
+		highlight.OutlineTransparency =
+			0
+
+		highlight.Enabled =
+			false
+
+		highlight.Parent =
+			character
+
+
+		data.Billboard =
+			billboard
+
+		data.Label =
+			label
+
+		data.Highlight =
+			highlight
+
+	end
+
+
+	if player.Character then
+
+		task.spawn(
+			onCharacter,
+			player.Character
+		)
+
+	end
+
+
+	player.CharacterAdded:
+		Connect(
+			onCharacter
+		)
+
+end
+
+
+for _, player in ipairs(
+	Players:GetPlayers()
+) do
+
+	setupPlayer(
+		player
+	)
+
+end
+
+
+Players.PlayerAdded:
+	Connect(
+		setupPlayer
+	)
+
+
+Players.PlayerRemoving:
+	Connect(function(player)
+
+	local data =
+		PlayerESP[
+			player
+		]
+
+
+	if data then
+
+		if data.Highlight then
+			data.Highlight:Destroy()
+		end
+
+
+		if data.Billboard then
+			data.Billboard:Destroy()
+		end
+
+	end
+
+
+	PlayerESP[
+		player
+	] =
+		nil
+
+end)
+
+
+local lastRadarUpdate =
+	0
+
+
+RunService.Heartbeat:
+	Connect(function()
+
+		local root =
+			getRoot()
+
+
+		if not root then
+			return
+		end
+
+
+		if radarCircleEnabled then
+
+			RadarCircle.Transparency =
+				0.7
+
+
+			RadarCircle.CFrame =
+
+				CFrame.new(
+
+					root.Position.X,
+
+					root.Position.Y
+						- 2.7,
+
+					root.Position.Z
+
+				)
+
+				*
+
+				CFrame.Angles(
+					0,
+					0,
+					math.rad(
+						90
+					)
+				)
+
+		else
+
+			RadarCircle.Transparency =
+				1
+
+		end
+
+
+		local nearby =
+			{}
+
+
+		for player, data in pairs(
+			PlayerESP
+		) do
+
+			local other =
+
+				player.Character
+
+				and player.Character:
+					FindFirstChild(
+						"HumanoidRootPart"
+					)
+
+
+			if
+				other
+
+				and data.Highlight
+
+				and data.Label
+			then
+
+				local distance =
+					(
+						other.Position
+						- root.Position
+					).Magnitude
+
+
+				if not playerHighlightEnabled then
+
+					data.Highlight.Enabled =
+						false
+
+
+					data.Label.TextColor3 =
+						Color3.new(
+							1,
+							1,
+							1
+						)
+
+				elseif distance
+					<= RED_RANGE
+				then
+
+					data.Highlight.Enabled =
+						true
+
+					data.Highlight.FillColor =
+						Color3.fromRGB(
+							255,
+							30,
+							30
+						)
+
+					data.Highlight.OutlineColor =
+						Color3.fromRGB(
+							255,
+							0,
+							0
+						)
+
+					data.Label.TextColor3 =
+						Color3.fromRGB(
+							255,
+							70,
+							70
+						)
+
+				elseif distance
+					<= GREEN_RANGE
+				then
+
+					data.Highlight.Enabled =
+						true
+
+					data.Highlight.FillColor =
+						Color3.fromRGB(
+							40,
+							255,
+							70
+						)
+
+					data.Highlight.OutlineColor =
+						Color3.fromRGB(
+							20,
+							255,
+							40
+						)
+
+					data.Label.TextColor3 =
+						Color3.fromRGB(
+							70,
+							255,
+							95
+						)
+
+				else
+
+					data.Highlight.Enabled =
+						false
+
+					data.Label.TextColor3 =
+						Color3.new(
+							1,
+							1,
+							1
+						)
+
+				end
+
+
+				if distance
+					<= GREEN_RANGE
+				then
+
+					table.insert(
+
+						nearby,
+
+						{
+
+							Player =
+								player,
+
+							Distance =
+								distance
+
+						}
+
+					)
+
+				end
+
+			end
+
+		end
+
+
+		if
+			os.clock()
+				- lastRadarUpdate
+			< RADAR_RATE
+		then
+
+			return
+
+		end
+
+
+		lastRadarUpdate =
+			os.clock()
+
+
+		for _, object in ipairs(
+			RadarList:GetChildren()
+		) do
+
+			if object:IsA(
+				"TextLabel"
+			) then
+
+				object:Destroy()
+
+			end
+
+		end
+
+
+		table.sort(
+			nearby,
+			function(a, b)
+
+				return
+					a.Distance
+					< b.Distance
+
+			end
+		)
+
+
+		for _, info in ipairs(
+			nearby
+		) do
+
+			local row =
+				Instance.new(
+					"TextLabel"
+				)
+
+			row.Size =
+				UDim2.new(
+					1,
+					-4,
+					0,
+					36
+				)
+
+			row.BackgroundColor3 =
+				Color3.fromRGB(
+					23,
+					23,
+					28
+				)
+
+			row.BorderSizePixel =
+				0
+
+
+			row.Text =
+				info.Player.Name
+				.. " • "
+				.. string.format(
+					"%.1f studs",
+					info.Distance
+				)
+
+
+			row.TextColor3 =
+
+				info.Distance <= RED_RANGE
+
+				and Color3.fromRGB(
+					255,
+					70,
+					70
+				)
+
+				or Color3.fromRGB(
+					80,
+					255,
+					100
+				)
+
+
+			row.Font =
+				Enum.Font.GothamBold
+
+			row.TextSize =
+				12
+
+			row.Parent =
+				RadarList
+
+
+			corner(
+				row,
+				8
+			)
+
+		end
+
+	end)
+
+
+--========================================================
+-- BRAINROT PANEL
+--========================================================
+
+local BrainrotPanel =
+	Instance.new(
+		"Frame"
+	)
+
+BrainrotPanel.AnchorPoint =
+	Vector2.new(
+		1,
+		0.5
+	)
+
+BrainrotPanel.Position =
+	tableToPosition(
+
+		Saved.BrainrotMenuPosition,
+
+		UDim2.new(
+			1,
+			-275,
+			0.5,
+			0
+		)
+
+	)
+
+BrainrotPanel.Size =
+	UDim2.new(
+		0,
+		285,
+		0,
+		360
+	)
+
+BrainrotPanel.BackgroundColor3 =
+	Color3.fromRGB(
+		12,
+		12,
+		16
+	)
+
+BrainrotPanel.BorderSizePixel =
+	0
+
+BrainrotPanel.Visible =
+	Saved.BrainrotMenuOpen
+	~= false
+
+BrainrotPanel.Parent =
+	Gui
+
+
+corner(
+	BrainrotPanel,
+	16
+)
+
+
+stroke(
+
+	BrainrotPanel,
+
+	2,
+
+	Color3.fromRGB(
+		255,
+		180,
+		30
+	)
+
+)
+
+
+local BrainrotTitle =
+	Instance.new(
+		"TextButton"
+	)
+
+BrainrotTitle.Size =
+	UDim2.new(
+		1,
+		-46,
+		0,
+		42
+	)
+
+BrainrotTitle.BackgroundTransparency =
+	1
+
+BrainrotTitle.AutoButtonColor =
+	false
+
+BrainrotTitle.Text =
+	"BRAINROTS $20M+"
+
+BrainrotTitle.TextColor3 =
+	Color3.fromRGB(
+		255,
+		220,
+		60
+	)
+
+BrainrotTitle.Font =
+	Enum.Font.GothamBlack
+
+BrainrotTitle.TextSize =
+	15
+
+BrainrotTitle.Parent =
+	BrainrotPanel
+
+
+local BrainrotClose =
+	Instance.new(
+		"TextButton"
+	)
+
+BrainrotClose.AnchorPoint =
+	Vector2.new(
+		1,
+		0
+	)
+
+BrainrotClose.Position =
+	UDim2.new(
+		1,
+		-7,
+		0,
+		6
+	)
+
+BrainrotClose.Size =
+	UDim2.new(
+		0,
+		34,
+		0,
+		30
+	)
+
+BrainrotClose.BackgroundColor3 =
+	Color3.fromRGB(
+		30,
+		30,
+		35
+	)
+
+BrainrotClose.BorderSizePixel =
+	0
+
+BrainrotClose.Text =
+	"×"
+
+BrainrotClose.TextColor3 =
+	Color3.new(
+		1,
+		1,
+		1
+	)
+
+BrainrotClose.Font =
+	Enum.Font.GothamBlack
+
+BrainrotClose.TextSize =
+	20
+
+BrainrotClose.Parent =
+	BrainrotPanel
+
+
+corner(
+	BrainrotClose,
+	8
+)
+
+
+local BrainrotList =
+	Instance.new(
+		"ScrollingFrame"
+	)
+
+BrainrotList.Position =
+	UDim2.new(
+		0,
+		8,
+		0,
+		44
+	)
+
+BrainrotList.Size =
+	UDim2.new(
+		1,
+		-16,
+		1,
+		-52
+	)
+
+BrainrotList.BackgroundTransparency =
+	1
+
+BrainrotList.BorderSizePixel =
+	0
+
+BrainrotList.AutomaticCanvasSize =
+	Enum.AutomaticSize.Y
+
+BrainrotList.CanvasSize =
+	UDim2.new()
+
+BrainrotList.ScrollBarThickness =
+	3
+
+BrainrotList.Parent =
+	BrainrotPanel
+
+
+local BrainrotLayout =
+	Instance.new(
+		"UIListLayout"
+	)
+
+BrainrotLayout.Padding =
+	UDim.new(
+		0,
+		6
+	)
+
+BrainrotLayout.Parent =
+	BrainrotList
+
+
+makeDraggable(
+	BrainrotPanel,
+	BrainrotTitle,
+	"BrainrotMenuPosition"
+)
+
+
+BrainrotClose.MouseButton1Click:
+	Connect(function()
+
+		BrainrotPanel.Visible =
+			false
+
+		Saved.BrainrotMenuOpen =
+			false
+
+		saveSettings()
+
+		if refreshButtons then
+			refreshButtons()
+		end
+
+	end)
+
+
+local SelectedBeam =
+	nil
+
+
+local SelectedAttachment =
+	nil
+
+
+local function selectBrainrot(
+	data
+)
+
+	if SelectedBeam then
+
+		SelectedBeam:Destroy()
+
+		SelectedBeam =
+			nil
+
+	end
+
+
+	if SelectedAttachment then
+
+		SelectedAttachment:Destroy()
+
+		SelectedAttachment =
+			nil
+
+	end
+
+
+	if
+		not data
+		or not data.Part
+		or not data.Part.Parent
+	then
+
+		return
+
+	end
+
+
+	SelectedAttachment =
+		Instance.new(
+			"Attachment"
+		)
+
+	SelectedAttachment.Parent =
+		data.Part
+
+
+	SelectedBeam =
+		Instance.new(
+			"Beam"
+		)
+
+	SelectedBeam.Attachment0 =
+		getRootAttachment()
+
+	SelectedBeam.Attachment1 =
+		SelectedAttachment
+
+	SelectedBeam.FaceCamera =
+		true
+
+	SelectedBeam.Width0 =
+		0.3
+
+	SelectedBeam.Width1 =
+		0.3
+
+	SelectedBeam.Color =
+		ColorSequence.new(
+			Color3.fromRGB(
+				255,
+				200,
+				30
+			)
+		)
+
+	SelectedBeam.Parent =
+		WorldFolder
+
+end
+
+
+local function refreshBrainrotList()
+
+	for _, object in ipairs(
+		BrainrotList:
+			GetChildren()
+	) do
+
+		if object:IsA(
+			"TextButton"
+		) then
+
+			object:Destroy()
+
+		end
+
+	end
+
+
+	local entries =
+		{}
+
+
+	for label, data in pairs(
+		MoneyTargets
+	) do
+
+		if
+			label
+			and label.Parent
+
+			and data
+
+			and data.Value
+				>= MIN_MONEY
+
+			and data.Part
+			and data.Part.Parent
+		then
+
+			table.insert(
+				entries,
+				data
+			)
+
+		end
+
+	end
+
+
+	table.sort(
+		entries,
+		function(a, b)
+
+			return
+				a.Value
+				> b.Value
+
+		end
+	)
+
+
+	for index, data in ipairs(
+		entries
+	) do
+
+		local row =
+			Instance.new(
+				"TextButton"
+			)
+
+		row.LayoutOrder =
+			index
+
+		row.Size =
+			UDim2.new(
+				1,
+				-4,
+				0,
+				50
+			)
+
+		row.BackgroundColor3 =
+			Color3.fromRGB(
+				23,
+				23,
+				28
+			)
+
+		row.BorderSizePixel =
+			0
+
+
+		row.Text =
+			"#"
+			.. tostring(
+				index
+			)
+			.. "  "
+			.. tostring(
+				data.Name
+			)
+			.. "\n"
+			.. tostring(
+				data.Text
+			)
+
+
+		row.TextColor3 =
+			Color3.fromRGB(
+				230,
+				230,
+				230
+			)
+
+		row.Font =
+			Enum.Font.GothamBold
+
+		row.TextSize =
+			12
+
+		row.Parent =
+			BrainrotList
+
+
+		corner(
+			row,
+			9
+		)
+
+
+		row.MouseButton1Click:
+			Connect(function()
+
+				selectBrainrot(
+					data
+				)
+
+			end)
+
+	end
+
+
+	BrainrotTitle.Text =
+		"BRAINROTS $20M+ • "
+		.. tostring(
+			#entries
+		)
+
+end
+
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		refreshBrainrotList()
+
+
+		task.wait(
+			BRAINROT_LIST_RATE
+		)
+
+	end
+
+end)
+
+
+--========================================================
+-- REFRESH BUTTONS
+--========================================================
+
+refreshButtons =
+	function()
+
+		updateToggle(
+			NearestButton,
+			NearestStroke,
+			"NEAREST STEAL",
+			nearestEnabled
+		)
+
+
+		updateToggle(
+			HighestButton,
+			HighestStroke,
+			"HIGHEST MONEY",
+			highestEnabled
+		)
+
+
+		updateToggle(
+			AutoKickButton,
+			AutoKickStroke,
+			"AUTO KICK",
+			autoKickEnabled
+		)
+
+
+		updateToggle(
+			AutoHopButton,
+			AutoHopStroke,
+			"AUTO HOP",
+			autoHopEnabled
+		)
+
+
+		updateToggle(
+			RadarCircleButton,
+			RadarCircleStroke,
+			"RADAR CIRCLE",
+			radarCircleEnabled
+		)
+
+
+		updateToggle(
+			PlayerHighlightButton,
+			PlayerHighlightStroke,
+			"PLAYER HIGHLIGHT",
+			playerHighlightEnabled
+		)
+
+
+		updateToggle(
+			RadarMenuButton,
+			RadarMenuStroke,
+			"RADAR MENU",
+			RadarPanel.Visible
+		)
+
+
+		updateToggle(
+			BrainrotMenuButton,
+			BrainrotMenuStroke,
+			"BRAINROT MENU",
+			BrainrotPanel.Visible
+		)
+
+end
+
+
+--========================================================
+-- NORMAL BUTTON ACTIONS
+--========================================================
+
+NearestButton.MouseButton1Click:
+	Connect(function()
+
+		nearestEnabled =
+			not nearestEnabled
+
+
+		if nearestEnabled then
+
+			highestEnabled =
+				false
+
+		end
+
+
+		Saved.NearestSteal =
+			nearestEnabled
+
+		Saved.HighestMoney =
+			highestEnabled
+
+
+		refreshButtons()
+
+		saveSettings()
+
+	end)
+
+
+HighestButton.MouseButton1Click:
+	Connect(function()
+
+		highestEnabled =
+			not highestEnabled
+
+
+		if highestEnabled then
+
+			nearestEnabled =
+				false
+
+		end
+
+
+		Saved.HighestMoney =
+			highestEnabled
+
+		Saved.NearestSteal =
+			nearestEnabled
+
+
+		refreshButtons()
+
+		saveSettings()
+
+	end)
+
+
+AutoKickButton.MouseButton1Click:
+	Connect(function()
+
+		autoKickEnabled =
+			not autoKickEnabled
+
+
+		kickTriggered =
+			false
+
+
+		Saved.AutoKick =
+			autoKickEnabled
+
+
+		refreshButtons()
+
+		saveSettings()
+
+	end)
+
+
+AutoHopButton.MouseButton1Click:
+	Connect(function()
+
+		autoHopEnabled =
+			not autoHopEnabled
+
+
+		Saved.AutoHop =
+			autoHopEnabled
+
+
+		refreshButtons()
+
+		saveSettings()
+
+	end)
+
+
+RadarCircleButton.MouseButton1Click:
+	Connect(function()
+
+		radarCircleEnabled =
+			not radarCircleEnabled
+
+
+		Saved.RadarCircle =
+			radarCircleEnabled
+
+
+		refreshButtons()
+
+		saveSettings()
+
+	end)
+
+
+PlayerHighlightButton.MouseButton1Click:
+	Connect(function()
+
+		playerHighlightEnabled =
+			not playerHighlightEnabled
+
+
+		Saved.PlayerHighlight =
+			playerHighlightEnabled
+
+
+		refreshButtons()
+
+		saveSettings()
+
+	end)
+
+
+RadarMenuButton.MouseButton1Click:
+	Connect(function()
+
+		RadarPanel.Visible =
+			not RadarPanel.Visible
+
+
+		Saved.RadarMenuOpen =
+			RadarPanel.Visible
+
+
+		refreshButtons()
+
+		saveSettings()
+
+	end)
+
+
+BrainrotMenuButton.MouseButton1Click:
+	Connect(function()
+
+		BrainrotPanel.Visible =
+			not BrainrotPanel.Visible
+
+
+		Saved.BrainrotMenuOpen =
+			BrainrotPanel.Visible
+
+
+		refreshButtons()
+
+		saveSettings()
+
+	end)
+
+
+--========================================================
+-- JOIN splizz999 / 50mia9
+--========================================================
+
+local joiningTarget =
+	false
+
+
+local function getRequestFunction()
+
+	return
+
+		request
+
+		or http_request
+
+		or (
+			syn
+			and syn.request
+		)
+
+end
+
+
+local function getUserId(
+	username
+)
+
+	local userId =
+		nil
+
+
+	local ok =
 		pcall(function()
 
 			userId =
@@ -223,42 +5085,148 @@ local function joinPlayer(
 		end)
 
 
-	if
-		not gotId
-		or not userId
-	then
+	if ok then
 
-		button.Text =
-			"NOT FOUND"
+		return userId
+
+	end
 
 
-		task.wait(
-			1
-		)
+	return nil
+
+end
 
 
-		button.Text =
-			originalText
+local function getPresence(
+	userId
+)
+
+	--====================================================
+	-- METHOD 1
+	-- Roblox Presence API
+	--====================================================
+
+	local req =
+		getRequestFunction()
 
 
-		joining =
-			false
+	if type(req) == "function" then
+
+		local ok,
+			response =
+			pcall(function()
+
+				return req({
+
+					Url =
+						"https://presence.roblox.com/v1/presence/users",
+
+					Method =
+						"POST",
+
+					Headers = {
+
+						["Content-Type"] =
+							"application/json"
+
+					},
+
+					Body =
+						HttpService:
+							JSONEncode({
+
+								userIds = {
+									userId
+								}
+
+							})
+
+				})
+
+			end)
 
 
-		return
+		if
+			ok
+
+			and response
+
+			and response.Body
+		then
+
+			local decodeOK,
+				data =
+				pcall(function()
+
+					return
+						HttpService:
+							JSONDecode(
+								response.Body
+							)
+
+				end)
+
+
+			if
+				decodeOK
+
+				and data
+
+				and data.userPresences
+
+				and data.userPresences[1]
+			then
+
+				local presence =
+					data.userPresences[1]
+
+
+				local presenceType =
+					tonumber(
+						presence.userPresenceType
+					)
+					or 0
+
+
+				local placeId =
+					tonumber(
+						presence.placeId
+					)
+
+
+				local jobId =
+					presence.gameId
+
+
+				if
+					presenceType == 2
+
+					and placeId
+
+					and jobId
+
+					and jobId ~= ""
+				then
+
+					return
+						placeId,
+						jobId
+
+				end
+
+			end
+
+		end
 
 	end
 
 
 	--====================================================
-	-- FIND THEIR CURRENT SERVER
+	-- METHOD 2
+	-- Roblox TeleportService fallback
 	--====================================================
 
-	button.Text =
-		"LOCATING..."
-
-
-	local success,
+	local ok,
 		currentInstance,
 		errorMessage,
 		placeId,
@@ -275,14 +5243,181 @@ local function joinPlayer(
 
 
 	if
-		not success
-		or not placeId
-		or not jobId
-		or jobId == ""
+		ok
+
+		and currentInstance
+
+		and tonumber(
+			placeId
+		)
+
+		and jobId
+
+		and jobId ~= ""
 	then
 
-		button.Text =
-			"OFFLINE/PRIVATE"
+		return
+
+			tonumber(
+				placeId
+			),
+
+			jobId
+
+	end
+
+
+	return
+		nil,
+		nil
+
+end
+
+
+local function setJoinText(
+	button,
+	text,
+	color
+)
+
+	button.Text =
+		text
+
+
+	if color then
+
+		button.TextColor3 =
+			color
+
+	end
+
+end
+
+
+local function joinPlayer(
+	username,
+	button
+)
+
+	if joiningTarget then
+		return
+	end
+
+
+	joiningTarget =
+		true
+
+
+	setJoinText(
+
+		button,
+
+		"FINDING "
+			.. username
+			.. "...",
+
+		Color3.fromRGB(
+			255,
+			220,
+			60
+		)
+
+	)
+
+
+	local userId =
+		getUserId(
+			username
+		)
+
+
+	if not userId then
+
+		setJoinText(
+
+			button,
+
+			"USER NOT FOUND",
+
+			Color3.fromRGB(
+				255,
+				80,
+				80
+			)
+
+		)
+
+
+		task.wait(
+			1
+		)
+
+
+		setJoinText(
+
+			button,
+
+			username,
+
+			Color3.fromRGB(
+				230,
+				230,
+				235
+			)
+
+		)
+
+
+		joiningTarget =
+			false
+
+
+		return
+
+	end
+
+
+	setJoinText(
+
+		button,
+
+		"LOCATING...",
+
+		Color3.fromRGB(
+			255,
+			220,
+			60
+		)
+
+	)
+
+
+	local placeId,
+		jobId =
+		getPresence(
+			userId
+		)
+
+
+	if
+		not placeId
+
+		or not jobId
+	then
+
+		setJoinText(
+
+			button,
+
+			"OFFLINE / PRIVATE",
+
+			Color3.fromRGB(
+				255,
+				100,
+				100
+			)
+
+		)
 
 
 		task.wait(
@@ -290,11 +5425,22 @@ local function joinPlayer(
 		)
 
 
-		button.Text =
-			originalText
+		setJoinText(
+
+			button,
+
+			username,
+
+			Color3.fromRGB(
+				230,
+				230,
+				235
+			)
+
+		)
 
 
-		joining =
+		joiningTarget =
 			false
 
 
@@ -303,17 +5449,25 @@ local function joinPlayer(
 	end
 
 
-	--====================================================
-	-- ALREADY IN THEIR SERVER
-	--====================================================
-
 	if
 		placeId == game.PlaceId
+
 		and jobId == game.JobId
 	then
 
-		button.Text =
-			"ALREADY HERE"
+		setJoinText(
+
+			button,
+
+			"ALREADY HERE",
+
+			Color3.fromRGB(
+				80,
+				255,
+				110
+			)
+
+		)
 
 
 		task.wait(
@@ -321,11 +5475,22 @@ local function joinPlayer(
 		)
 
 
-		button.Text =
-			originalText
+		setJoinText(
+
+			button,
+
+			username,
+
+			Color3.fromRGB(
+				230,
+				230,
+				235
+			)
+
+		)
 
 
-		joining =
+		joiningTarget =
 			false
 
 
@@ -334,31 +5499,69 @@ local function joinPlayer(
 	end
 
 
-	--====================================================
-	-- JOIN
-	--====================================================
+	-- Stop Auto Hop so it doesn't drag you out
+	-- after manually joining the player.
 
-	button.Text =
-		"JOINING..."
+	autoHopEnabled =
+		false
 
 
-	local teleported =
+	Saved.AutoHop =
+		false
+
+
+	refreshButtons()
+
+	saveSettings()
+
+
+	setJoinText(
+
+		button,
+
+		"JOINING...",
+
+		Color3.fromRGB(
+			80,
+			255,
+			110
+		)
+
+	)
+
+
+	local ok =
 		pcall(function()
 
 			TeleportService:
 				TeleportToPlaceInstance(
+
 					placeId,
+
 					jobId,
+
 					LP
+
 				)
 
 		end)
 
 
-	if not teleported then
+	if not ok then
 
-		button.Text =
-			"JOIN FAILED"
+		setJoinText(
+
+			button,
+
+			"JOIN FAILED",
+
+			Color3.fromRGB(
+				255,
+				80,
+				80
+			)
+
+		)
 
 
 		task.wait(
@@ -366,11 +5569,22 @@ local function joinPlayer(
 		)
 
 
-		button.Text =
-			originalText
+		setJoinText(
+
+			button,
+
+			username,
+
+			Color3.fromRGB(
+				230,
+				230,
+				235
+			)
+
+		)
 
 
-		joining =
+		joiningTarget =
 			false
 
 	end
@@ -378,14 +5592,11 @@ local function joinPlayer(
 end
 
 
---========================================================
--- BUTTON EVENTS
---========================================================
-
 SplizzButton.MouseButton1Click:
 	Connect(function()
 
-		joinPlayer(
+		task.spawn(
+			joinPlayer,
 			"splizz999",
 			SplizzButton
 		)
@@ -396,9 +5607,669 @@ SplizzButton.MouseButton1Click:
 MiaButton.MouseButton1Click:
 	Connect(function()
 
-		joinPlayer(
+		task.spawn(
+			joinPlayer,
 			"50mia9",
 			MiaButton
 		)
 
 	end)
+
+
+--========================================================
+-- SERVER HOP
+--========================================================
+
+local hopping =
+	false
+
+
+local failedServers =
+	{}
+
+
+local function getHTTP(
+	url
+)
+
+	local req =
+		getRequestFunction()
+
+
+	if type(req) == "function" then
+
+		local ok,
+			response =
+			pcall(function()
+
+				return req({
+
+					Url =
+						url,
+
+					Method =
+						"GET"
+
+				})
+
+			end)
+
+
+		if
+			ok
+
+			and response
+
+			and response.Body
+		then
+
+			return
+				response.Body
+
+		end
+
+	end
+
+
+	local ok,
+		body =
+		pcall(function()
+
+			return
+				game:
+					HttpGet(
+						url
+					)
+
+		end)
+
+
+	if ok then
+
+		return body
+
+	end
+
+
+	return nil
+
+end
+
+
+local function getServerCandidates()
+
+	local url =
+
+		"https://games.roblox.com/v1/games/"
+
+		.. tostring(
+			TARGET_PLACE_ID
+		)
+
+		.. "/servers/Public?sortOrder=Asc&limit=100"
+
+
+	local body =
+		getHTTP(
+			url
+		)
+
+
+	if not body then
+
+		return {}
+
+	end
+
+
+	local ok,
+		data =
+		pcall(function()
+
+			return
+				HttpService:
+					JSONDecode(
+						body
+					)
+
+		end)
+
+
+	if
+		not ok
+
+		or not data
+
+		or type(
+			data.data
+		) ~= "table"
+	then
+
+		return {}
+
+	end
+
+
+	local servers =
+		{}
+
+
+	for _, server in ipairs(
+		data.data
+	) do
+
+		local id =
+			server.id
+
+
+		local playing =
+			tonumber(
+				server.playing
+			)
+
+
+		local maximum =
+			tonumber(
+				server.maxPlayers
+			)
+
+
+		if
+			id
+
+			and id ~= game.JobId
+
+			and not failedServers[
+				id
+			]
+
+			and playing
+
+			and maximum
+
+			and playing
+				< maximum
+		then
+
+			table.insert(
+				servers,
+				server
+			)
+
+		end
+
+	end
+
+
+	return servers
+
+end
+
+
+local function resetHopButton()
+
+	HopButton.Text =
+		"HOP"
+
+	HopButton.TextSize =
+		24
+
+end
+
+
+local function serverHop()
+
+	if hopping then
+		return
+	end
+
+
+	hopping =
+		true
+
+
+	HopButton.Text =
+		"FINDING..."
+
+	HopButton.TextSize =
+		14
+
+
+	task.spawn(function()
+
+		for _ = 1, 6 do
+
+			if not hopping then
+				return
+			end
+
+
+			local servers =
+				getServerCandidates()
+
+
+			if #servers > 0 then
+
+				local server =
+					servers[
+						RNG:
+							NextInteger(
+								1,
+								#servers
+							)
+					]
+
+
+				if
+					server
+
+					and server.id
+
+					and server.id
+						~= game.JobId
+				then
+
+					HopButton.Text =
+						"HOPPING..."
+
+
+					local ok =
+						pcall(function()
+
+							TeleportService:
+								TeleportToPlaceInstance(
+
+									TARGET_PLACE_ID,
+
+									server.id,
+
+									LP
+
+								)
+
+						end)
+
+
+					if ok then
+						return
+					end
+
+
+					failedServers[
+						server.id
+					] =
+						true
+
+				end
+
+			else
+
+				-- Old fallback behavior:
+				-- ask Roblox to place us normally.
+
+				HopButton.Text =
+					"RANDOM..."
+
+
+				pcall(function()
+
+					TeleportService:
+						Teleport(
+							TARGET_PLACE_ID,
+							LP
+						)
+
+				end)
+
+			end
+
+
+			task.wait(
+				0.15
+			)
+
+		end
+
+
+		hopping =
+			false
+
+
+		resetHopButton()
+
+	end)
+
+end
+
+
+pcall(function()
+
+	TeleportService.TeleportInitFailed:
+		Connect(function(player)
+
+			if player ~= LP then
+				return
+			end
+
+
+			hopping =
+				false
+
+
+			resetHopButton()
+
+		end)
+
+end)
+
+
+HopButton.MouseButton1Click:
+	Connect(function()
+
+		task.spawn(
+			serverHop
+		)
+
+	end)
+
+
+UserInputService.InputBegan:
+	Connect(function(
+		input,
+		processed
+	)
+
+		if processed then
+			return
+		end
+
+
+		if
+			input.KeyCode
+				== Enum.KeyCode.Z
+		then
+
+			task.spawn(
+				serverHop
+			)
+
+		end
+
+	end)
+
+
+--========================================================
+-- OLD SIMPLE AUTO HOP
+-- 1 SECOND
+--========================================================
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		if autoHopEnabled then
+
+			local elapsed =
+				os.clock()
+				- JOIN_TIME
+
+
+			if elapsed
+				>= AUTO_HOP_JOIN_WAIT
+			then
+
+				scanMoney()
+
+
+				local found =
+					hasGoodBrainrot()
+
+
+				if found then
+
+					stopAutoHop()
+
+
+					hopping =
+						false
+
+
+					resetHopButton()
+
+				elseif not hopping then
+
+					serverHop()
+
+				end
+
+			end
+
+		end
+
+
+		task.wait(
+			0.1
+		)
+
+	end
+
+end)
+
+
+--========================================================
+-- KEEP ESP BEAMS ATTACHED
+--========================================================
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		local attachment =
+			getRootAttachment()
+
+
+		for label, data in pairs(
+			BrainrotESP
+		) do
+
+			if
+				not label.Parent
+
+				or not data.Beam
+			then
+
+				removeBrainrotESP(
+					label
+				)
+
+			elseif attachment then
+
+				data.Beam.Attachment0 =
+					attachment
+
+			end
+
+		end
+
+
+		if
+			SelectedBeam
+
+			and attachment
+		then
+
+			SelectedBeam.Attachment0 =
+				attachment
+
+		end
+
+
+		task.wait(
+			0.25
+		)
+
+	end
+
+end)
+
+
+--========================================================
+-- MOBILE
+--========================================================
+
+if UserInputService.TouchEnabled then
+
+	addScale(
+		MainMenu,
+		MOBILE_MENU_SCALE
+	)
+
+
+	addScale(
+		RadarPanel,
+		MOBILE_MENU_SCALE
+	)
+
+
+	addScale(
+		BrainrotPanel,
+		MOBILE_MENU_SCALE
+	)
+
+
+	addScale(
+		Progress,
+		MOBILE_MENU_SCALE
+	)
+
+
+	HopHolder.AnchorPoint =
+		Vector2.new(
+			0.5,
+			0
+		)
+
+
+	HopHolder.Position =
+		UDim2.new(
+			0.5,
+			0,
+			0,
+			26
+		)
+
+
+	MainOpen.Position =
+		UDim2.new(
+			0,
+			8,
+			0.5,
+			0
+		)
+
+end
+
+
+--========================================================
+-- RESPAWN
+--========================================================
+
+LP.CharacterAdded:
+	Connect(function()
+
+		RootAttachment =
+			nil
+
+		stealing =
+			false
+
+		currentPrompt =
+			nil
+
+		Progress.Visible =
+			false
+
+	end)
+
+
+--========================================================
+-- SAVE LOOP
+--========================================================
+
+task.spawn(function()
+
+	while Gui.Parent do
+
+		task.wait(
+			2
+		)
+
+
+		Saved.MainMenuPosition =
+			positionToTable(
+				MainMenu.Position
+			)
+
+
+		Saved.RadarMenuPosition =
+			positionToTable(
+				RadarPanel.Position
+			)
+
+
+		Saved.BrainrotMenuPosition =
+			positionToTable(
+				BrainrotPanel.Position
+			)
+
+
+		Saved.MainMenuOpen =
+			MainMenu.Visible
+
+
+		Saved.RadarMenuOpen =
+			RadarPanel.Visible
+
+
+		Saved.BrainrotMenuOpen =
+			BrainrotPanel.Visible
+
+
+		Saved.NearestSteal =
+			nearestEnabled
+
+
+		Saved.HighestMoney =
+			highestEnabled
+
+
+		Saved.AutoKick =
+			autoKickEnabled
+
+
+		Saved.AutoHop =
+			autoHopEnabled
+
+
+		Saved.RadarCircle =
+			radarCircleEnabled
+
+
+		Saved.PlayerHighlight =
+			playerHighlightEnabled
+
+
+		saveSettings()
+
+	end
+
+end)
+
+
+--========================================================
+-- START
+--========================================================
+
+refreshButtons()
+
+scanMoney()

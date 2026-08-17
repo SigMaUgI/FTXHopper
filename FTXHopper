@@ -43,7 +43,6 @@ local MIN_MONEY = 20_000_000
 local GREEN_RANGE = 30
 local RED_RANGE = 20
 
--- IMPORTANT:
 local AUTO_HOP_JOIN_WAIT = 3
 
 local MONEY_SCAN_RATE = 1
@@ -1072,16 +1071,6 @@ local playerHighlightEnabled =
 
 --========================================================
 -- IMPORTANT AUTO HOP STATE
---========================================================
---
--- FALSE when script loads in a new server.
---
--- TRUE only when YOU manually turn Auto Hop on.
---
--- This allows the CURRENT server to be ignored once
--- even if it already has a $20M+ brainrot.
---
--- After the hop it resets because the script reloads.
 --========================================================
 
 local autoHopManuallyRestarted =
@@ -3356,18 +3345,8 @@ AutoKickButton.MouseButton1Click:
 
 	end)
 
---========================================================
--- AUTO HOP BUTTON
---
--- THIS IS THE IMPORTANT FIX
---========================================================
-
 AutoHopButton.MouseButton1Click:
 	Connect(function()
-
-		--============================================
-		-- TURN OFF
-		--============================================
 
 		if autoHopEnabled then
 
@@ -3385,16 +3364,6 @@ AutoHopButton.MouseButton1Click:
 
 			return
 		end
-
-		--============================================
-		-- TURN ON MANUALLY
-		--
-		-- Even if current server contains $20M+,
-		-- Auto Hop remains ON.
-		--
-		-- It is allowed to hop away from THIS server
-		-- one time.
-		--============================================
 
 		autoHopEnabled =
 			true
@@ -3507,10 +3476,6 @@ local function getPresence(userId)
 	local req =
 		getRequestFunction()
 
-	--============================================
-	-- PRESENCE API
-	--============================================
-
 	if type(req) == "function" then
 
 		local success,
@@ -3593,10 +3558,6 @@ local function getPresence(userId)
 			end
 		end
 	end
-
-	--============================================
-	-- BUILT-IN FALLBACK
-	--============================================
 
 	local success,
 		currentInstance,
@@ -3698,8 +3659,6 @@ local function joinPlayer(
 		return
 	end
 
-	-- Stop Auto Hop when manually joining them.
-
 	autoHopEnabled = false
 
 	autoHopManuallyRestarted =
@@ -3760,219 +3719,271 @@ MiaButton.MouseButton1Click:
 
 --========================================================
 -- SERVER HOPPER
--- NO JOBID SAME-SERVER CHECK
 --========================================================
 
 local hopping = false
 
-local SERVER_FINGERPRINT_FILE =
-	"FTX_LastPlayers.json"
+local failedServers = {}
 
-local SAME_SERVER_OVERLAP =
-	0.70
+local function getHTTP(url)
 
-local SAME_SERVER_RETRY =
-	0.15
+	local req =
+		getRequestFunction()
 
+	if type(req) == "function" then
 
-local function getCurrentServerPlayers()
+		local success,
+			response =
+			pcall(function()
 
-	local result = {}
+				return req({
+					Url = url,
+					Method = "GET"
+				})
+			end)
 
-	for _, player in ipairs(
-		Players:GetPlayers()
-	) do
+		if
+			success
+			and response
+			and response.Body
+		then
 
-		if player ~= LP then
-
-			result[
-				tostring(
-					player.UserId
-				)
-			] = true
-
+			return response.Body
 		end
-
 	end
 
-	return result
+	local success,
+		body =
+		pcall(function()
 
+			return game:HttpGet(url)
+		end)
+
+	if success then
+		return body
+	end
 end
 
+local function getServerCandidates()
 
-local function saveServerPlayers()
-
-	if
-		typeof(writefile) ~= "function"
-	then
-		return
-	end
-
-	local playersNow =
-		getCurrentServerPlayers()
-
-	pcall(function()
-
-		writefile(
-			SERVER_FINGERPRINT_FILE,
-
-			HttpService:JSONEncode(
-				playersNow
-			)
+	local url =
+		"https://games.roblox.com/v1/games/"
+		.. tostring(
+			TARGET_PLACE_ID
 		)
+		.. "/servers/Public?sortOrder=Asc&limit=100"
 
-	end)
+	local body =
+		getHTTP(url)
 
-end
+	if not body then
+		return {}
+	end
 
+	local success,
+		data =
+		pcall(function()
 
-local function loadPreviousPlayers()
+			return
+				HttpService:
+					JSONDecode(
+						body
+					)
+		end)
 
 	if
-		typeof(readfile) ~= "function"
-		or
-		typeof(isfile) ~= "function"
+		not success
+		or not data
+		or type(data.data) ~= "table"
 	then
-		return nil
+		return {}
 	end
 
-	if not isfile(
-		SERVER_FINGERPRINT_FILE
-	) then
-		return nil
-	end
+	local servers = {}
 
-	local result = nil
-
-	pcall(function()
-
-		result =
-			HttpService:JSONDecode(
-				readfile(
-					SERVER_FINGERPRINT_FILE
-				)
-			)
-
-	end)
-
-	return result
-
-end
-
-
-local function sameServerByPlayers()
-
-	local previous =
-		loadPreviousPlayers()
-
-	if type(previous) ~= "table" then
-		return false
-	end
-
-	local current =
-		getCurrentServerPlayers()
-
-	local previousCount = 0
-	local matches = 0
-
-	for userId in pairs(
-		previous
+	for _, server in ipairs(
+		data.data
 	) do
 
-		previousCount += 1
+		local id =
+			server.id
 
-		if current[userId] then
-			matches += 1
+		local playing =
+			tonumber(
+				server.playing
+			)
+
+		local maximum =
+			tonumber(
+				server.maxPlayers
+			)
+
+		if
+			id
+			and id ~= game.JobId
+			and not failedServers[id]
+			and playing
+			and maximum
+			and playing < maximum
+		then
+
+			table.insert(
+				servers,
+				server
+			)
 		end
-
 	end
 
-	if previousCount == 0 then
-		return false
-	end
-
-	local overlap =
-		matches
-		/ previousCount
-
-	return
-		overlap
-		>= SAME_SERVER_OVERLAP
-
+	return servers
 end
-
 
 local function resetHopButton()
 
-	HopButton.Text =
-		"HOP"
-
-	HopButton.TextSize =
-		24
-
+	HopButton.Text = "HOP"
+	HopButton.TextSize = 24
 end
 
+--========================================================
+-- IMPORTANT FIX:
+--
+-- manualHop = true:
+--     HOP button / Z can still work when Auto Hop is OFF.
+--
+-- manualHop = false:
+--     automatic calls are BLOCKED when Auto Hop is OFF.
+--========================================================
 
-local function serverHop()
+local function serverHop(manualHop)
+
+	if
+		not manualHop
+		and not autoHopEnabled
+	then
+		return
+	end
 
 	if hopping then
 		return
 	end
 
-	hopping =
-		true
+	hopping = true
 
 	HopButton.Text =
-		"HOPPING..."
+		"FINDING..."
 
-	HopButton.TextSize =
-		14
-
-	saveServerPlayers()
+	HopButton.TextSize = 14
 
 	task.spawn(function()
 
-		local success =
-			pcall(function()
+		for _ = 1, 6 do
 
-				TeleportService:
-					Teleport(
-						TARGET_PLACE_ID,
-						LP
-					)
+			-- Auto Hop may have been switched OFF
+			-- while this loop was already running.
+			if
+				not manualHop
+				and not autoHopEnabled
+			then
 
-			end)
+				hopping = false
+				resetHopButton()
 
-		if not success then
+				return
+			end
 
-			hopping =
-				false
+			if not hopping then
+				return
+			end
 
-			resetHopButton()
+			local servers =
+				getServerCandidates()
 
-			task.delay(
-				SAME_SERVER_RETRY,
-				function()
+			if #servers > 0 then
 
+				local server =
+					servers[
+						RNG:
+							NextInteger(
+								1,
+								#servers
+							)
+					]
+
+				if
+					server
+					and server.id
+					and server.id ~= game.JobId
+				then
+
+					-- Check AGAIN immediately before teleport.
 					if
-						autoHopEnabled
-						and
-						Gui.Parent
+						not manualHop
+						and not autoHopEnabled
 					then
 
-						serverHop()
+						hopping = false
+						resetHopButton()
 
+						return
 					end
 
-				end
-			)
+					HopButton.Text =
+						"HOPPING..."
 
+					local success =
+						pcall(function()
+
+							TeleportService:
+								TeleportToPlaceInstance(
+									TARGET_PLACE_ID,
+									server.id,
+									LP
+								)
+						end)
+
+					if success then
+						return
+					end
+
+					failedServers[
+						server.id
+					] = true
+				end
+
+			else
+
+				if
+					not manualHop
+					and not autoHopEnabled
+				then
+
+					hopping = false
+					resetHopButton()
+
+					return
+				end
+
+				HopButton.Text =
+					"RANDOM..."
+
+				pcall(function()
+
+					TeleportService:
+						Teleport(
+							TARGET_PLACE_ID,
+							LP
+						)
+				end)
+			end
+
+			task.wait(0.15)
 		end
 
+		hopping = false
+
+		resetHopButton()
+
 	end)
-
 end
-
 
 pcall(function()
 
@@ -3983,44 +3994,21 @@ pcall(function()
 				return
 			end
 
-			hopping =
-				false
+			hopping = false
 
 			resetHopButton()
-
-			if autoHopEnabled then
-
-				task.delay(
-					SAME_SERVER_RETRY,
-					function()
-
-						if
-							autoHopEnabled
-							and
-							Gui.Parent
-						then
-
-							serverHop()
-
-						end
-
-					end
-				)
-
-			end
-
 		end)
-
 end)
 
+--========================================================
+-- MANUAL HOP
+--========================================================
 
 HopButton.MouseButton1Click:
 	Connect(function()
 
-		serverHop()
-
+		serverHop(true)
 	end)
-
 
 UserInputService.InputBegan:
 	Connect(function(
@@ -4037,106 +4025,12 @@ UserInputService.InputBegan:
 				== Enum.KeyCode.Z
 		then
 
-			serverHop()
-
+			serverHop(true)
 		end
-
 	end)
 
-
---========================================================
--- CHECK IF MATCHMAKING SENT US BACK
---
--- IMPORTANT:
--- GOOD $20M+ SERVER ALWAYS WINS.
--- NEVER RE-HOP IF SOMETHING GOOD IS HERE.
---========================================================
-
-task.spawn(function()
-
-	-- Wait for the server + brainrot UI to load.
-	task.wait(
-		AUTO_HOP_JOIN_WAIT
-	)
-
-	-- Scan BEFORE deciding to re-hop.
-	scanMoney()
-
-	local foundGood =
-		hasGoodBrainrot()
-
-	--====================================================
-	-- $20M+ FOUND
-	--
-	-- Stay in this server and turn Auto Hop OFF.
-	--====================================================
-
-	if foundGood then
-
-		autoHopEnabled =
-			false
-
-		autoHopManuallyRestarted =
-			false
-
-		Saved.AutoHop =
-			false
-
-		hopping =
-			false
-
-		resetHopButton()
-
-		refreshButtons()
-		saveSettings()
-
-		return
-
-	end
-
-	--====================================================
-	-- NOTHING GOOD
-	--
-	-- Only now check whether Roblox put us back
-	-- into what looks like the same server.
-	--====================================================
-
-	if sameServerByPlayers() then
-
-		hopping =
-			false
-
-		HopButton.Text =
-			"RE-HOPPING..."
-
-		task.wait(
-			0.05
-		)
-
-		serverHop()
-
-	end
-
-end)
 --========================================================
 -- AUTO HOP
---
--- BEHAVIOR:
---
--- 1. Wait 3 seconds after joining.
---
--- 2. If Auto Hop carried over from the previous server:
---      $20M+ = TURN OFF.
---      No $20M+ = HOP.
---
--- 3. If YOU manually turn Auto Hop ON:
---      ignore $20M+ in CURRENT server once.
---      hop anyway.
---
--- 4. After the hop the script reloads,
---    autoHopManuallyRestarted becomes FALSE.
---
--- 5. Therefore the NEXT $20M+ server stops Auto Hop.
 --========================================================
 
 local function stopAutoHop()
@@ -4148,8 +4042,12 @@ local function stopAutoHop()
 
 	Saved.AutoHop = false
 
+	hopping = false
+
 	refreshButtons()
 	saveSettings()
+
+	resetHopButton()
 end
 
 task.spawn(function()
@@ -4167,29 +4065,17 @@ task.spawn(function()
 				>= AUTO_HOP_JOIN_WAIT
 			then
 
-				--====================================
-				-- MANUALLY TURNED ON
-				--
-				-- LEAVE CURRENT SERVER EVEN IF GOOD.
-				--====================================
-
 				if autoHopManuallyRestarted then
 
 					if not hopping then
 
-						-- Consume the one-time override.
-
 						autoHopManuallyRestarted =
 							false
 
-						serverHop()
+						serverHop(false)
 					end
 
 				else
-
-					--================================
-					-- NORMAL AUTO-HOP SCAN
-					--================================
 
 					scanMoney()
 
@@ -4198,21 +4084,11 @@ task.spawn(function()
 
 					if found then
 
-						-- GOOD SERVER:
-						-- TURN AUTO HOP OFF.
-
 						stopAutoHop()
-
-						hopping = false
-
-						resetHopButton()
 
 					elseif not hopping then
 
-						-- NOTHING GOOD:
-						-- KEEP HOPPING.
-
-						serverHop()
+						serverHop(false)
 					end
 				end
 			end

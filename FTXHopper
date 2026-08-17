@@ -103,7 +103,7 @@ local RED_RANGE =
 
 
 local AUTO_HOP_JOIN_WAIT =
-	1
+	2.5
 
 
 local MONEY_SCAN_RATE =

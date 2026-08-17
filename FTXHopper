@@ -4046,11 +4046,60 @@ UserInputService.InputBegan:
 
 --========================================================
 -- CHECK IF MATCHMAKING SENT US BACK
+--
+-- IMPORTANT:
+-- GOOD $20M+ SERVER ALWAYS WINS.
+-- NEVER RE-HOP IF SOMETHING GOOD IS HERE.
 --========================================================
 
 task.spawn(function()
 
-	task.wait(1.5)
+	-- Wait for the server + brainrot UI to load.
+	task.wait(
+		AUTO_HOP_JOIN_WAIT
+	)
+
+	-- Scan BEFORE deciding to re-hop.
+	scanMoney()
+
+	local foundGood =
+		hasGoodBrainrot()
+
+	--====================================================
+	-- $20M+ FOUND
+	--
+	-- Stay in this server and turn Auto Hop OFF.
+	--====================================================
+
+	if foundGood then
+
+		autoHopEnabled =
+			false
+
+		autoHopManuallyRestarted =
+			false
+
+		Saved.AutoHop =
+			false
+
+		hopping =
+			false
+
+		resetHopButton()
+
+		refreshButtons()
+		saveSettings()
+
+		return
+
+	end
+
+	--====================================================
+	-- NOTHING GOOD
+	--
+	-- Only now check whether Roblox put us back
+	-- into what looks like the same server.
+	--====================================================
 
 	if sameServerByPlayers() then
 
@@ -4060,13 +4109,16 @@ task.spawn(function()
 		HopButton.Text =
 			"RE-HOPPING..."
 
-		task.wait(0.05)
+		task.wait(
+			0.05
+		)
 
 		serverHop()
 
 	end
 
-end)--========================================================
+end)
+--========================================================
 -- AUTO HOP
 --
 -- BEHAVIOR:

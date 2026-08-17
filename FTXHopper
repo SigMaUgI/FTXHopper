@@ -1,5 +1,5 @@
 --========================================================
--- FTX ALL-IN-ONE - ULTRA FAST SERVER HOP
+-- FTX ALL-IN-ONE - FAST DIFFERENT SERVER HOP
 --========================================================
 
 if not game:IsLoaded() then
@@ -52,12 +52,11 @@ local GOOD_SOUND_ID =
 local MOBILE_MENU_SCALE = 0.5
 
 --========================================================
--- ULTRA FAST HOP SETTINGS
+-- FAST HOP SETTINGS
 --========================================================
 
-local HOP_RETRY_DELAY = 0.01
-local SERVER_PAGE_LIMIT = 100
-local MAX_RECENT_SERVERS = 75
+local HOP_RETRY_DELAY = 0.05
+local MAX_RECENT_SERVERS = 12
 
 --========================================================
 -- SAVE DATA
@@ -176,7 +175,7 @@ local function saveSettings()
 
 end
 
--- Load preferences immediately.
+-- load FTX data immediately
 loadSettings()
 
 --========================================================
@@ -249,7 +248,6 @@ Gui.Name = "FTX_AllInOne"
 Gui.ResetOnSpawn = false
 Gui.IgnoreGuiInset = true
 Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
 Gui.Parent = CoreGui
 
 local WorldFolder = Instance.new("Folder")
@@ -284,6 +282,7 @@ local function stroke(parent, size, color)
 	local s = Instance.new("UIStroke")
 
 	s.Thickness = size or 2
+
 	s.Color =
 		color
 		or Color3.fromRGB(
@@ -555,6 +554,7 @@ HopButton.Size =
 	UDim2.fromScale(1, 1)
 
 HopButton.BackgroundTransparency = 1
+HopButton.AutoButtonColor = false
 
 HopButton.Text = "HOP"
 
@@ -570,7 +570,8 @@ HopButton.Font =
 
 HopButton.TextSize = 24
 
-HopButton.Parent = HopHolder
+HopButton.Parent =
+	HopHolder
 
 local HopGradient =
 	Instance.new("UIGradient")
@@ -626,7 +627,8 @@ task.spawn(function()
 
 				{
 					Rotation =
-						HopGradient.Rotation + 360
+						HopGradient.Rotation
+						+ 360
 				}
 
 			)
@@ -642,7 +644,8 @@ end)
 -- MAIN MENU
 --========================================================
 
-local MainMenu = Instance.new("Frame")
+local MainMenu =
+	Instance.new("Frame")
 
 MainMenu.AnchorPoint =
 	Vector2.new(0, 0.5)
@@ -710,6 +713,7 @@ MainHeader.Size =
 	)
 
 MainHeader.BackgroundTransparency = 1
+MainHeader.AutoButtonColor = false
 
 MainHeader.Text =
 	"FTX CONTROLS"
@@ -758,7 +762,6 @@ MainClose.BackgroundColor3 =
 	)
 
 MainClose.BorderSizePixel = 0
-
 MainClose.Text = "×"
 
 MainClose.TextColor3 =
@@ -825,7 +828,8 @@ MainOpen.TextSize = 14
 MainOpen.Visible =
 	not MainMenu.Visible
 
-MainOpen.Parent = Gui
+MainOpen.Parent =
+	Gui
 
 corner(
 	MainOpen,
@@ -854,8 +858,11 @@ MainClose.MouseButton1Click:Connect(function()
 	MainOpen.Visible = true
 
 	Saved.MainMenuOpen = false
+
 	Saved.MainMenuPosition =
-		savePos(MainMenu.Position)
+		savePos(
+			MainMenu.Position
+		)
 
 	saveSettings()
 
@@ -873,7 +880,7 @@ MainOpen.MouseButton1Click:Connect(function()
 end)
 
 --========================================================
--- CONTROL BUTTONS
+-- CONTROLS
 --========================================================
 
 local Controls =
@@ -903,16 +910,24 @@ Controls.BorderSizePixel = 0
 Controls.AutomaticCanvasSize =
 	Enum.AutomaticSize.Y
 
-Controls.CanvasSize = UDim2.new()
+Controls.CanvasSize =
+	UDim2.new()
+
 Controls.ScrollBarThickness = 3
 
-Controls.Parent = MainMenu
+Controls.Parent =
+	MainMenu
 
 local ControlLayout =
-	Instance.new("UIListLayout")
+	Instance.new(
+		"UIListLayout"
+	)
 
 ControlLayout.Padding =
-	UDim.new(0, 8)
+	UDim.new(
+		0,
+		8
+	)
 
 ControlLayout.Parent =
 	Controls
@@ -945,12 +960,15 @@ local function makeControl(name)
 		Enum.Font.GothamBold
 
 	b.TextSize = 13
-
 	b.Text = name
 
-	b.Parent = Controls
+	b.Parent =
+		Controls
 
-	corner(b, 10)
+	corner(
+		b,
+		10
+	)
 
 	local s =
 		stroke(
@@ -1105,7 +1123,7 @@ local function updateToggle(
 end
 
 --========================================================
--- MONEY PARSER
+-- MONEY
 --========================================================
 
 local function parseMoney(text)
@@ -1141,7 +1159,8 @@ local function parseMoney(text)
 		return nil
 	end
 
-	number = tonumber(number)
+	number =
+		tonumber(number)
 
 	if not number then
 		return nil
@@ -1173,23 +1192,46 @@ end
 local function formatMoney(value)
 
 	if value >= 1e15 then
-		return string.format("$%.2fQ/s", value / 1e15)
+
+		return string.format(
+			"$%.2fQ/s",
+			value / 1e15
+		)
+
 	elseif value >= 1e12 then
-		return string.format("$%.2fT/s", value / 1e12)
+
+		return string.format(
+			"$%.2fT/s",
+			value / 1e12
+		)
+
 	elseif value >= 1e9 then
-		return string.format("$%.2fB/s", value / 1e9)
+
+		return string.format(
+			"$%.2fB/s",
+			value / 1e9
+		)
+
 	elseif value >= 1e6 then
-		return string.format("$%.2fM/s", value / 1e6)
+
+		return string.format(
+			"$%.2fM/s",
+			value / 1e6
+		)
+
 	end
 
-	return "$"
-		.. tostring(math.floor(value))
+	return
+		"$"
+		.. tostring(
+			math.floor(value)
+		)
 		.. "/s"
 
 end
 
 --========================================================
--- FIND WORLD PART
+-- WORLD PART
 --========================================================
 
 local function getWorldPart(obj)
@@ -1203,8 +1245,12 @@ local function getWorldPart(obj)
 		end
 
 		if
-			current:IsA("BillboardGui")
-			or current:IsA("SurfaceGui")
+			current:IsA(
+				"BillboardGui"
+			)
+			or current:IsA(
+				"SurfaceGui"
+			)
 		then
 
 			local a =
@@ -1212,14 +1258,23 @@ local function getWorldPart(obj)
 
 			if a then
 
-				if a:IsA("BasePart") then
+				if a:IsA(
+					"BasePart"
+				) then
+
 					return a
+
 				end
 
 				if
-					a:IsA("Attachment")
+					a:IsA(
+						"Attachment"
+					)
 					and a.Parent
-					and a.Parent:IsA("BasePart")
+					and a.Parent:
+						IsA(
+							"BasePart"
+						)
 				then
 
 					return a.Parent
@@ -1230,11 +1285,17 @@ local function getWorldPart(obj)
 
 		end
 
-		if current:IsA("BasePart") then
+		if current:IsA(
+			"BasePart"
+		) then
+
 			return current
+
 		end
 
-		if current:IsA("Model") then
+		if current:IsA(
+			"Model"
+		) then
 
 			return
 				current.PrimaryPart
@@ -1246,7 +1307,8 @@ local function getWorldPart(obj)
 
 		end
 
-		current = current.Parent
+		current =
+			current.Parent
 
 	end
 
@@ -1281,7 +1343,6 @@ local function findBrainrotName(label)
 			FindFirstAncestorWhichIsA(
 				"BillboardGui"
 			)
-
 		or label:
 			FindFirstAncestorWhichIsA(
 				"SurfaceGui"
@@ -1300,13 +1361,19 @@ local function findBrainrotName(label)
 		if
 			obj ~= label
 			and (
-				obj:IsA("TextLabel")
-				or obj:IsA("TextButton")
+				obj:IsA(
+					"TextLabel"
+				)
+				or obj:IsA(
+					"TextButton"
+				)
 			)
 		then
 
 			local text =
-				tostring(obj.Text or "")
+				tostring(
+					obj.Text or ""
+				)
 
 			local upper =
 				text:upper()
@@ -1404,7 +1471,6 @@ local function createESP(label, data)
 
 	billboard.AlwaysOnTop = true
 	billboard.LightInfluence = 0
-
 	billboard.MaxDistance = 100000
 
 	billboard.Size =
@@ -1431,7 +1497,10 @@ local function createESP(label, data)
 		)
 
 	text.Size =
-		UDim2.fromScale(1, 1)
+		UDim2.fromScale(
+			1,
+			1
+		)
 
 	text.BackgroundTransparency = 1
 
@@ -1442,6 +1511,7 @@ local function createESP(label, data)
 			90
 		)
 
+	-- 65% transparent
 	text.TextTransparency = 0.65
 	text.TextStrokeTransparency = 0.65
 
@@ -1495,12 +1565,10 @@ local function createESP(label, data)
 		WorldFolder
 
 	BrainrotESP[label] = {
-
 		Gui = billboard,
 		Label = text,
 		Attachment = attachment,
 		Beam = beam
-
 	}
 
 end
@@ -1511,11 +1579,15 @@ local function checkMoney(obj)
 		not obj
 		or not obj.Parent
 	then
+
 		return
+
 	end
 
 	local value =
-		parseMoney(obj.Text)
+		parseMoney(
+			obj.Text
+		)
 
 	if not value then
 
@@ -1555,6 +1627,7 @@ local function checkMoney(obj)
 		if not announced[obj] then
 
 			announced[obj] = true
+
 			playGoodSound()
 
 		end
@@ -1578,6 +1651,7 @@ local function checkMoney(obj)
 	else
 
 		announced[obj] = nil
+
 		removeESP(obj)
 
 	end
@@ -1591,10 +1665,16 @@ local function watchMoney(obj)
 	end
 
 	if
-		not obj:IsA("TextLabel")
-		and not obj:IsA("TextButton")
+		not obj:IsA(
+			"TextLabel"
+		)
+		and not obj:IsA(
+			"TextButton"
+		)
 	then
+
 		return
+
 	end
 
 	WatchedMoney[obj] = true
@@ -1602,7 +1682,9 @@ local function watchMoney(obj)
 	checkMoney(obj)
 
 	obj:
-		GetPropertyChangedSignal("Text"):
+		GetPropertyChangedSignal(
+			"Text"
+		):
 		Connect(function()
 
 			checkMoney(obj)
@@ -1618,8 +1700,12 @@ local function scanMoney()
 	) do
 
 		if
-			obj:IsA("TextLabel")
-			or obj:IsA("TextButton")
+			obj:IsA(
+				"TextLabel"
+			)
+			or obj:IsA(
+				"TextButton"
+			)
 		then
 
 			watchMoney(obj)
@@ -1635,10 +1721,14 @@ local function scanMoney()
 
 end
 
-task.spawn(scanMoney)
+task.spawn(
+	scanMoney
+)
 
 workspace.DescendantAdded:
-	Connect(watchMoney)
+	Connect(
+		watchMoney
+	)
 
 task.spawn(function()
 
@@ -1662,7 +1752,10 @@ local BrainrotPanel =
 	Instance.new("Frame")
 
 BrainrotPanel.AnchorPoint =
-	Vector2.new(1, 0.5)
+	Vector2.new(
+		1,
+		0.5
+	)
 
 BrainrotPanel.Position =
 	loadPos(
@@ -1717,7 +1810,9 @@ stroke(
 )
 
 local BrainrotTitle =
-	Instance.new("TextButton")
+	Instance.new(
+		"TextButton"
+	)
 
 BrainrotTitle.Size =
 	UDim2.new(
@@ -1748,10 +1843,15 @@ BrainrotTitle.Parent =
 	BrainrotPanel
 
 local BrainrotClose =
-	Instance.new("TextButton")
+	Instance.new(
+		"TextButton"
+	)
 
 BrainrotClose.AnchorPoint =
-	Vector2.new(1, 0)
+	Vector2.new(
+		1,
+		0
+	)
 
 BrainrotClose.Position =
 	UDim2.new(
@@ -1776,15 +1876,20 @@ BrainrotClose.BackgroundColor3 =
 		35
 	)
 
+BrainrotClose.BorderSizePixel = 0
 BrainrotClose.Text = "×"
+
 BrainrotClose.TextColor3 =
-	Color3.new(1, 1, 1)
+	Color3.new(
+		1,
+		1,
+		1
+	)
 
 BrainrotClose.Font =
 	Enum.Font.GothamBlack
 
 BrainrotClose.TextSize = 20
-BrainrotClose.BorderSizePixel = 0
 
 BrainrotClose.Parent =
 	BrainrotPanel
@@ -1830,10 +1935,15 @@ BrainrotList.Parent =
 	BrainrotPanel
 
 local BrainrotLayout =
-	Instance.new("UIListLayout")
+	Instance.new(
+		"UIListLayout"
+	)
 
 BrainrotLayout.Padding =
-	UDim.new(0, 6)
+	UDim.new(
+		0,
+		6
+	)
 
 BrainrotLayout.Parent =
 	BrainrotList
@@ -1849,7 +1959,9 @@ BrainrotClose.MouseButton1Click:
 
 		BrainrotPanel.Visible = false
 
-		Saved.BrainrotMenuOpen = false
+		Saved.BrainrotMenuOpen =
+			false
+
 		Saved.BrainrotMenuPosition =
 			savePos(
 				BrainrotPanel.Position
@@ -1903,7 +2015,9 @@ local function selectBrainrot(data)
 		data.Part
 
 	SelectedBeam =
-		Instance.new("Beam")
+		Instance.new(
+			"Beam"
+		)
 
 	SelectedBeam.Attachment0 =
 		getRootAttachment()
@@ -1936,8 +2050,12 @@ local function refreshBrainrotList()
 		BrainrotList:GetChildren()
 	) do
 
-		if obj:IsA("TextButton") then
+		if obj:IsA(
+			"TextButton"
+		) then
+
 			obj:Destroy()
+
 		end
 
 	end
@@ -2032,7 +2150,9 @@ local function refreshBrainrotList()
 		row.MouseButton1Click:
 			Connect(function()
 
-				selectBrainrot(data)
+				selectBrainrot(
+					data
+				)
 
 			end)
 
@@ -2040,7 +2160,9 @@ local function refreshBrainrotList()
 
 	BrainrotTitle.Text =
 		"BRAINROTS $20M+ • "
-		.. tostring(#entries)
+		.. tostring(
+			#entries
+		)
 
 end
 
@@ -2063,10 +2185,15 @@ end)
 --========================================================
 
 local RadarPanel =
-	Instance.new("Frame")
+	Instance.new(
+		"Frame"
+	)
 
 RadarPanel.AnchorPoint =
-	Vector2.new(1, 0.5)
+	Vector2.new(
+		1,
+		0.5
+	)
 
 RadarPanel.Position =
 	loadPos(
@@ -2121,7 +2248,9 @@ stroke(
 )
 
 local RadarTitle =
-	Instance.new("TextButton")
+	Instance.new(
+		"TextButton"
+	)
 
 RadarTitle.Size =
 	UDim2.new(
@@ -2151,10 +2280,15 @@ RadarTitle.Parent =
 	RadarPanel
 
 local RadarClose =
-	Instance.new("TextButton")
+	Instance.new(
+		"TextButton"
+	)
 
 RadarClose.AnchorPoint =
-	Vector2.new(1, 0)
+	Vector2.new(
+		1,
+		0
+	)
 
 RadarClose.Position =
 	UDim2.new(
@@ -2184,7 +2318,11 @@ RadarClose.BorderSizePixel = 0
 RadarClose.Text = "×"
 
 RadarClose.TextColor3 =
-	Color3.new(1, 1, 1)
+	Color3.new(
+		1,
+		1,
+		1
+	)
 
 RadarClose.Font =
 	Enum.Font.GothamBlack
@@ -2235,10 +2373,15 @@ RadarList.Parent =
 	RadarPanel
 
 local RadarLayout =
-	Instance.new("UIListLayout")
+	Instance.new(
+		"UIListLayout"
+	)
 
 RadarLayout.Padding =
-	UDim.new(0, 5)
+	UDim.new(
+		0,
+		5
+	)
 
 RadarLayout.Parent =
 	RadarList
@@ -2254,7 +2397,9 @@ RadarClose.MouseButton1Click:
 
 		RadarPanel.Visible = false
 
-		Saved.RadarMenuOpen = false
+		Saved.RadarMenuOpen =
+			false
+
 		Saved.RadarMenuPosition =
 			savePos(
 				RadarPanel.Position
@@ -2269,7 +2414,9 @@ RadarClose.MouseButton1Click:
 --========================================================
 
 local RadarCircle =
-	Instance.new("Part")
+	Instance.new(
+		"Part"
+	)
 
 RadarCircle.Name =
 	"FTX_RADAR_CIRCLE"
@@ -2288,14 +2435,17 @@ RadarCircle.Anchored = true
 RadarCircle.CanCollide = false
 RadarCircle.CanQuery = false
 RadarCircle.CanTouch = false
-
 RadarCircle.CastShadow = false
 
 RadarCircle.Material =
 	Enum.Material.SmoothPlastic
 
 RadarCircle.Color =
-	Color3.new(1, 1, 1)
+	Color3.new(
+		1,
+		1,
+		1
+	)
 
 RadarCircle.Transparency =
 	radarCircleEnabled
@@ -2351,7 +2501,9 @@ local function setupPlayer(player)
 				"BillboardGui"
 			)
 
-		billboard.Adornee = head
+		billboard.Adornee =
+			head
+
 		billboard.AlwaysOnTop = true
 
 		billboard.Size =
@@ -2369,7 +2521,8 @@ local function setupPlayer(player)
 				0
 			)
 
-		billboard.Parent = Gui
+		billboard.Parent =
+			Gui
 
 		local name =
 			Instance.new(
@@ -2405,23 +2558,31 @@ local function setupPlayer(player)
 			billboard
 
 		local highlight =
-			Instance.new("Highlight")
+			Instance.new(
+				"Highlight"
+			)
 
-		highlight.Adornee = char
+		highlight.Adornee =
+			char
 
 		highlight.DepthMode =
 			Enum.HighlightDepthMode.AlwaysOnTop
 
 		highlight.FillTransparency = 0.2
 		highlight.OutlineTransparency = 0
-
 		highlight.Enabled = false
 
-		highlight.Parent = char
+		highlight.Parent =
+			char
 
-		data.Billboard = billboard
-		data.Label = name
-		data.Highlight = highlight
+		data.Billboard =
+			billboard
+
+		data.Label =
+			name
+
+		data.Highlight =
+			highlight
 
 	end
 
@@ -2435,7 +2596,9 @@ local function setupPlayer(player)
 	end
 
 	player.CharacterAdded:
-		Connect(characterAdded)
+		Connect(
+			characterAdded
+		)
 
 end
 
@@ -2448,7 +2611,9 @@ for _, p in ipairs(
 end
 
 Players.PlayerAdded:
-	Connect(setupPlayer)
+	Connect(
+		setupPlayer
+	)
 
 --========================================================
 -- RADAR UPDATE
@@ -2458,7 +2623,8 @@ local lastRadar = 0
 
 RunService.Heartbeat:Connect(function()
 
-	local root = getRoot()
+	local root =
+		getRoot()
 
 	if not root then
 		return
@@ -2466,13 +2632,19 @@ RunService.Heartbeat:Connect(function()
 
 	if radarCircleEnabled then
 
-		RadarCircle.Transparency = 0.7
+		RadarCircle.Transparency =
+			0.7
 
 		RadarCircle.CFrame =
 			CFrame.new(
+
 				root.Position.X,
-				root.Position.Y - 2.7,
+
+				root.Position.Y
+					- 2.7,
+
 				root.Position.Z
+
 			)
 			* CFrame.Angles(
 				0,
@@ -2482,7 +2654,8 @@ RunService.Heartbeat:Connect(function()
 
 	else
 
-		RadarCircle.Transparency = 1
+		RadarCircle.Transparency =
+			1
 
 	end
 
@@ -2512,7 +2685,8 @@ RunService.Heartbeat:Connect(function()
 
 			if not playerHighlightEnabled then
 
-				data.Highlight.Enabled = false
+				data.Highlight.Enabled =
+					false
 
 				data.Label.TextColor3 =
 					Color3.new(
@@ -2523,7 +2697,8 @@ RunService.Heartbeat:Connect(function()
 
 			elseif distance <= RED_RANGE then
 
-				data.Highlight.Enabled = true
+				data.Highlight.Enabled =
+					true
 
 				data.Highlight.FillColor =
 					Color3.fromRGB(
@@ -2548,7 +2723,8 @@ RunService.Heartbeat:Connect(function()
 
 			elseif distance <= GREEN_RANGE then
 
-				data.Highlight.Enabled = true
+				data.Highlight.Enabled =
+					true
 
 				data.Highlight.FillColor =
 					Color3.fromRGB(
@@ -2573,7 +2749,8 @@ RunService.Heartbeat:Connect(function()
 
 			else
 
-				data.Highlight.Enabled = false
+				data.Highlight.Enabled =
+					false
 
 				data.Label.TextColor3 =
 					Color3.new(
@@ -2601,7 +2778,8 @@ RunService.Heartbeat:Connect(function()
 	end
 
 	if
-		os.clock() - lastRadar
+		os.clock()
+			- lastRadar
 		< RADAR_UPDATE_INTERVAL
 	then
 
@@ -2609,14 +2787,19 @@ RunService.Heartbeat:Connect(function()
 
 	end
 
-	lastRadar = os.clock()
+	lastRadar =
+		os.clock()
 
 	for _, obj in ipairs(
 		RadarList:GetChildren()
 	) do
 
-		if obj:IsA("TextLabel") then
+		if obj:IsA(
+			"TextLabel"
+		) then
+
 			obj:Destroy()
+
 		end
 
 	end
@@ -2668,6 +2851,7 @@ RunService.Heartbeat:Connect(function()
 
 		text.TextColor3 =
 			info.Distance <= RED_RANGE
+
 			and Color3.fromRGB(
 				255,
 				70,
@@ -2688,7 +2872,10 @@ RunService.Heartbeat:Connect(function()
 		text.Parent =
 			RadarList
 
-		corner(text, 8)
+		corner(
+			text,
+			8
+		)
 
 	end
 
@@ -2712,8 +2899,12 @@ local function findOwnerBase()
 	) do
 
 		if
-			gui:IsA("BillboardGui")
-			or gui:IsA("SurfaceGui")
+			gui:IsA(
+				"BillboardGui"
+			)
+			or gui:IsA(
+				"SurfaceGui"
+			)
 		then
 
 			for _, label in ipairs(
@@ -2722,8 +2913,12 @@ local function findOwnerBase()
 
 				if
 					(
-						label:IsA("TextLabel")
-						or label:IsA("TextButton")
+						label:IsA(
+							"TextLabel"
+						)
+						or label:IsA(
+							"TextButton"
+						)
 					)
 					and tostring(
 						label.Text or ""
@@ -2737,7 +2932,9 @@ local function findOwnerBase()
 				then
 
 					local part =
-						getWorldPart(gui)
+						getWorldPart(
+							gui
+						)
 
 					if part then
 						return part
@@ -2775,7 +2972,8 @@ task.spawn(function()
 					BaseAttachment:Destroy()
 				end
 
-				BasePart = found
+				BasePart =
+					found
 
 				BaseAttachment =
 					Instance.new(
@@ -2786,7 +2984,9 @@ task.spawn(function()
 					found
 
 				BaseBeam =
-					Instance.new("Beam")
+					Instance.new(
+						"Beam"
+					)
 
 				BaseBeam.Attachment0 =
 					getRootAttachment()
@@ -2869,7 +3069,9 @@ local function checkStole(text)
 
 		kickTriggered = true
 
-		LP:Kick("You stole")
+		LP:Kick(
+			"You stole"
+		)
 
 	end
 
@@ -2882,8 +3084,12 @@ local function watchUI(obj)
 	end
 
 	if
-		not obj:IsA("TextLabel")
-		and not obj:IsA("TextButton")
+		not obj:IsA(
+			"TextLabel"
+		)
+		and not obj:IsA(
+			"TextButton"
+		)
 	then
 
 		return
@@ -2892,13 +3098,19 @@ local function watchUI(obj)
 
 	watchedUI[obj] = true
 
-	checkStole(obj.Text)
+	checkStole(
+		obj.Text
+	)
 
 	obj:
-		GetPropertyChangedSignal("Text"):
+		GetPropertyChangedSignal(
+			"Text"
+		):
 		Connect(function()
 
-			checkStole(obj.Text)
+			checkStole(
+				obj.Text
+			)
 
 		end)
 
@@ -2913,7 +3125,9 @@ for _, obj in ipairs(
 end
 
 PlayerGui.DescendantAdded:
-	Connect(watchUI)
+	Connect(
+		watchUI
+	)
 
 --========================================================
 -- STEAL PROMPTS
@@ -2923,8 +3137,12 @@ local Prompts = {}
 
 local function addPrompt(obj)
 
-	if obj:IsA("ProximityPrompt") then
+	if obj:IsA(
+		"ProximityPrompt"
+	) then
+
 		Prompts[obj] = true
+
 	end
 
 end
@@ -2938,7 +3156,9 @@ for _, obj in ipairs(
 end
 
 workspace.DescendantAdded:
-	Connect(addPrompt)
+	Connect(
+		addPrompt
+	)
 
 local function isStealPrompt(prompt)
 
@@ -2989,12 +3209,22 @@ local function promptPosition(prompt)
 
 	end
 
-	if prompt.Parent:IsA("Attachment") then
-		return prompt.Parent.WorldPosition
+	if prompt.Parent:IsA(
+		"Attachment"
+	) then
+
+		return
+			prompt.Parent.WorldPosition
+
 	end
 
-	if prompt.Parent:IsA("BasePart") then
-		return prompt.Parent.Position
+	if prompt.Parent:IsA(
+		"BasePart"
+	) then
+
+		return
+			prompt.Parent.Position
+
 	end
 
 	local model =
@@ -3023,8 +3253,13 @@ end
 
 local function promptDistance(prompt)
 
-	local root = getRoot()
-	local pos = promptPosition(prompt)
+	local root =
+		getRoot()
+
+	local pos =
+		promptPosition(
+			prompt
+		)
 
 	if not root or not pos then
 		return math.huge
@@ -3044,24 +3279,33 @@ local function getNearestPrompt()
 	local bestDistance =
 		math.huge
 
-	for prompt in pairs(Prompts) do
+	for prompt in pairs(
+		Prompts
+	) do
 
-		if isStealPrompt(prompt) then
+		if isStealPrompt(
+			prompt
+		) then
 
 			local distance =
-				promptDistance(prompt)
+				promptDistance(
+					prompt
+				)
 
 			if
 				distance
-				<= (
-					prompt.MaxActivationDistance
-					+ 0.75
-				)
+					<= (
+						prompt.MaxActivationDistance
+						+ 0.75
+					)
 				and distance < bestDistance
 			then
 
-				best = prompt
-				bestDistance = distance
+				best =
+					prompt
+
+				bestDistance =
+					distance
 
 			end
 
@@ -3076,7 +3320,9 @@ end
 local function getPromptMoney(prompt)
 
 	local pos =
-		promptPosition(prompt)
+		promptPosition(
+			prompt
+		)
 
 	if not pos then
 		return nil
@@ -3107,8 +3353,11 @@ local function getPromptMoney(prompt)
 				and distance <= 25
 			then
 
-				nearest = distance
-				money = data.Value
+				nearest =
+					distance
+
+				money =
+					data.Value
 
 			end
 
@@ -3123,33 +3372,45 @@ end
 local function getHighestPrompt()
 
 	local best
-	local bestMoney = -math.huge
+	local bestMoney =
+		-math.huge
 
-	for prompt in pairs(Prompts) do
+	for prompt in pairs(
+		Prompts
+	) do
 
-		if isStealPrompt(prompt) then
+		if isStealPrompt(
+			prompt
+		) then
 
 			local distance =
-				promptDistance(prompt)
+				promptDistance(
+					prompt
+				)
 
 			if
 				distance
-				<= (
-					prompt.MaxActivationDistance
-					+ 0.75
-				)
+					<= (
+						prompt.MaxActivationDistance
+						+ 0.75
+					)
 			then
 
 				local money =
-					getPromptMoney(prompt)
+					getPromptMoney(
+						prompt
+					)
 
 				if
 					money
 					and money > bestMoney
 				then
 
-					bestMoney = money
-					best = prompt
+					bestMoney =
+						money
+
+					best =
+						prompt
 
 				end
 
@@ -3181,7 +3442,8 @@ local function holdPrompt(prompt)
 
 	pcall(function()
 
-		prompt:InputHoldBegin()
+		prompt:
+			InputHoldBegin()
 
 		local hold =
 			math.max(
@@ -3189,9 +3451,12 @@ local function holdPrompt(prompt)
 				0.05
 			)
 
-		task.wait(hold + 0.05)
+		task.wait(
+			hold + 0.05
+		)
 
-		prompt:InputHoldEnd()
+		prompt:
+			InputHoldEnd()
 
 	end)
 
@@ -3314,7 +3579,10 @@ NearestButton.MouseButton1Click:
 			not nearestEnabled
 
 		if nearestEnabled then
-			highestEnabled = false
+
+			highestEnabled =
+				false
+
 		end
 
 		Saved.NearestSteal =
@@ -3335,7 +3603,10 @@ HighestButton.MouseButton1Click:
 			not highestEnabled
 
 		if highestEnabled then
-			nearestEnabled = false
+
+			nearestEnabled =
+				false
+
 		end
 
 		Saved.HighestMoney =
@@ -3355,7 +3626,8 @@ AutoKickButton.MouseButton1Click:
 		autoKickEnabled =
 			not autoKickEnabled
 
-		kickTriggered = false
+		kickTriggered =
+			false
 
 		Saved.AutoKick =
 			autoKickEnabled
@@ -3376,11 +3648,13 @@ AutoHopButton.MouseButton1Click:
 
 		if autoHopEnabled then
 
-			manualAutoHopRestart = true
+			manualAutoHopRestart =
+				true
 
 		else
 
-			manualAutoHopRestart = false
+			manualAutoHopRestart =
+				false
 
 		end
 
@@ -3448,19 +3722,23 @@ BrainrotMenuButton.MouseButton1Click:
 RadarClose.MouseButton1Click:
 	Connect(function()
 
-		task.defer(refreshButtons)
+		task.defer(
+			refreshButtons
+		)
 
 	end)
 
 BrainrotClose.MouseButton1Click:
 	Connect(function()
 
-		task.defer(refreshButtons)
+		task.defer(
+			refreshButtons
+		)
 
 	end)
 
 --========================================================
--- ULTRA FAST SERVER HOP
+-- FAST DIFFERENT SERVER HOP
 --========================================================
 
 local recentServers = {}
@@ -3474,14 +3752,36 @@ for _, id in ipairs(
 	if
 		type(id) == "string"
 		and id ~= ""
+		and id ~= game.JobId
 	then
 
-		recentServers[id] = true
+		recentServers[id] =
+			true
 
 		table.insert(
 			recentOrder,
 			id
 		)
+
+	end
+
+end
+
+while
+	#recentOrder
+	> MAX_RECENT_SERVERS
+do
+
+	local old =
+		table.remove(
+			recentOrder,
+			1
+		)
+
+	if old then
+
+		recentServers[old] =
+			nil
 
 	end
 
@@ -3496,17 +3796,21 @@ local function saveRecent()
 
 end
 
-local function addRecent(id)
+local function rememberServer(id)
 
 	if
 		not id
 		or id == ""
+		or id == game.JobId
 		or recentServers[id]
 	then
+
 		return
+
 	end
 
-	recentServers[id] = true
+	recentServers[id] =
+		true
 
 	table.insert(
 		recentOrder,
@@ -3518,14 +3822,17 @@ local function addRecent(id)
 		> MAX_RECENT_SERVERS
 	do
 
-		local removed =
+		local old =
 			table.remove(
 				recentOrder,
 				1
 			)
 
-		if removed then
-			recentServers[removed] = nil
+		if old then
+
+			recentServers[old] =
+				nil
+
 		end
 
 	end
@@ -3534,29 +3841,10 @@ local function addRecent(id)
 
 end
 
--- Current server is immediately protected.
-addRecent(game.JobId)
+local function clearRecent()
 
-local function removeRecent(id)
-
-	if not id then
-		return
-	end
-
-	recentServers[id] = nil
-
-	for i = #recentOrder, 1, -1 do
-
-		if recentOrder[i] == id then
-
-			table.remove(
-				recentOrder,
-				i
-			)
-
-		end
-
-	end
+	recentServers = {}
+	recentOrder = {}
 
 	saveRecent()
 
@@ -3564,15 +3852,18 @@ end
 
 local function executorGet(url)
 
-	local success,
+	local ok,
 		body =
 		pcall(function()
 
-			return game:HttpGet(url)
+			return game:
+				HttpGet(
+					url
+				)
 
 		end)
 
-	if success and body then
+	if ok and body then
 		return body
 	end
 
@@ -3586,7 +3877,7 @@ local function executorGet(url)
 
 	if type(req) == "function" then
 
-		local ok,
+		local requestOK,
 			response =
 			pcall(function()
 
@@ -3598,7 +3889,7 @@ local function executorGet(url)
 			end)
 
 		if
-			ok
+			requestOK
 			and response
 			and response.Body
 		then
@@ -3613,20 +3904,23 @@ local function executorGet(url)
 
 end
 
-local function fetchFastPage(order)
+local function fetchServers(order)
 
 	local url =
 		"https://games.roblox.com/v1/games/"
-		.. tostring(TARGET_PLACE_ID)
+		.. tostring(
+			TARGET_PLACE_ID
+		)
 		.. "/servers/Public?sortOrder="
 		.. tostring(order)
-		.. "&limit="
-		.. tostring(SERVER_PAGE_LIMIT)
+		.. "&limit=100"
 
-	local raw =
-		executorGet(url)
+	local body =
+		executorGet(
+			url
+		)
 
-	if not raw then
+	if not body then
 		return nil
 	end
 
@@ -3636,7 +3930,9 @@ local function fetchFastPage(order)
 
 			return
 				HttpService:
-					JSONDecode(raw)
+					JSONDecode(
+						body
+					)
 
 		end)
 
@@ -3644,32 +3940,26 @@ local function fetchFastPage(order)
 		return nil
 	end
 
-	return data.data or {}
+	return
+		data.data
+		or {}
 
 end
 
-local function chooseInstantServer()
-
-	-- Try ASC first.
-	local servers =
-		fetchFastPage("Asc")
-
-	-- If request failed, instantly try Desc.
-	if not servers or #servers == 0 then
-
-		servers =
-			fetchFastPage("Desc")
-
-	end
+local function pickServerFromPage(
+	servers,
+	ignoreRecent
+)
 
 	if not servers then
 		return nil
 	end
 
-	local fresh = {}
-	local fallback = {}
+	local candidates = {}
 
-	for _, server in ipairs(servers) do
+	for _, server in ipairs(
+		servers
+	) do
 
 		local id =
 			server.id
@@ -3692,135 +3982,109 @@ local function chooseInstantServer()
 			and playing
 			and maxPlayers
 			and playing < maxPlayers
+			and (
+				ignoreRecent
+				or not recentServers[id]
+			)
 		then
 
-			-- Preferred:
-			-- never used recently.
-			if not recentServers[id] then
-
-				table.insert(
-					fresh,
-					id
-				)
-
-			else
-
-				-- Backup only if every visible
-				-- server has already been visited.
-				table.insert(
-					fallback,
-					id
-				)
-
-			end
-
-		end
-
-	end
-
-	if #fresh > 0 then
-
-		return fresh[
-			RNG:NextInteger(
-				1,
-				#fresh
-			)
-		]
-
-	end
-
-	-- If first page only contains recent servers,
-	-- try opposite ordering immediately.
-	local second =
-		fetchFastPage("Desc")
-
-	if second then
-
-		for _, server in ipairs(second) do
-
-			local id =
-				server.id
-
-			local playing =
-				tonumber(
-					server.playing
-				)
-
-			local maxPlayers =
-				tonumber(
-					server.maxPlayers
-				)
-
-			if
+			table.insert(
+				candidates,
 				id
-				and id ~= ""
-				and id ~= game.JobId
-				and not failedServers[id]
-				and not recentServers[id]
-				and playing
-				and maxPlayers
-				and playing < maxPlayers
-			then
-
-				table.insert(
-					fresh,
-					id
-				)
-
-			end
+			)
 
 		end
 
 	end
 
-	if #fresh > 0 then
+	if #candidates == 0 then
+		return nil
+	end
 
-		return fresh[
-			RNG:NextInteger(
-				1,
-				#fresh
-			)
+	return
+		candidates[
+			RNG:
+				NextInteger(
+					1,
+					#candidates
+				)
 		]
 
+end
+
+local function getDifferentServer()
+
+	-- randomize which server ordering we use first
+	-- so repeated hops don't always see the exact same page first
+
+	local firstOrder =
+		RNG:NextInteger(
+			1,
+			2
+		) == 1
+		and "Asc"
+		or "Desc"
+
+	local secondOrder =
+		firstOrder == "Asc"
+		and "Desc"
+		or "Asc"
+
+	-- first page
+	local firstPage =
+		fetchServers(
+			firstOrder
+		)
+
+	local serverId =
+		pickServerFromPage(
+			firstPage,
+			false
+		)
+
+	if serverId then
+		return serverId
 	end
 
-	-- Never pick current JobId.
-	-- Old entries are rotated only when needed.
-	if #fallback > 0 then
+	-- opposite page
+	local secondPage =
+		fetchServers(
+			secondOrder
+		)
 
-		local removeCount =
-			math.max(
-				1,
-				math.floor(
-					#recentOrder / 2
-				)
-			)
+	serverId =
+		pickServerFromPage(
+			secondPage,
+			false
+		)
 
-		for _ = 1, removeCount do
+	if serverId then
+		return serverId
+	end
 
-			local old =
-				table.remove(
-					recentOrder,
-					1
-				)
+	-- if the tiny recent history is blocking everything,
+	-- delete the history instead of searching for 30 seconds
 
-			if old and old ~= game.JobId then
+	clearRecent()
 
-				recentServers[old] = nil
+	serverId =
+		pickServerFromPage(
+			firstPage,
+			true
+		)
 
-			elseif old == game.JobId then
+	if serverId then
+		return serverId
+	end
 
-				table.insert(
-					recentOrder,
-					old
-				)
+	serverId =
+		pickServerFromPage(
+			secondPage,
+			true
+		)
 
-			end
-
-		end
-
-		saveRecent()
-
+	if serverId then
+		return serverId
 	end
 
 	return nil
@@ -3831,8 +4095,11 @@ local hopping = false
 
 local function resetHopButton()
 
-	HopButton.Text = "HOP"
-	HopButton.TextSize = 24
+	HopButton.Text =
+		"HOP"
+
+	HopButton.TextSize =
+		24
 
 end
 
@@ -3844,12 +4111,6 @@ local function serverHop()
 
 	hopping = true
 
-	HopButton.Text =
-		"HOPPING..."
-
-	HopButton.TextSize =
-		14
-
 	task.spawn(function()
 
 		while
@@ -3857,15 +4118,19 @@ local function serverHop()
 			and hopping
 		do
 
-			-- No giant page scan.
-			-- Immediately request first page.
+			HopButton.Text =
+				"HOPPING..."
+
+			HopButton.TextSize =
+				14
+
 			local serverId =
-				chooseInstantServer()
+				getDifferentServer()
 
 			if not serverId then
 
 				HopButton.Text =
-					"FINDING..."
+					"RETRYING..."
 
 				task.wait(
 					HOP_RETRY_DELAY
@@ -3875,24 +4140,19 @@ local function serverHop()
 
 			end
 
-			-- HARD PROTECTION.
-			if
-				serverId
-				== game.JobId
-			then
+			-- hard current-server check
+			if serverId == game.JobId then
 
 				failedServers[
 					serverId
-				] = true
+				] =
+					true
 
 				task.wait()
 
 				continue
 
 			end
-
-			HopButton.Text =
-				"HOPPING..."
 
 			local success =
 				pcall(function()
@@ -3912,38 +4172,31 @@ local function serverHop()
 
 			if success then
 
-				-- Save after Roblox accepted the
-				-- teleport request.
-				addRecent(
+				rememberServer(
 					serverId
 				)
 
-				-- Do not sit around with a long watchdog.
-				-- Roblox now owns the transition.
 				return
-
-			else
-
-				failedServers[
-					serverId
-				] = true
-
-				removeRecent(
-					serverId
-				)
-
-				HopButton.Text =
-					"RETRYING..."
-
-				task.wait(
-					HOP_RETRY_DELAY
-				)
 
 			end
 
+			failedServers[
+				serverId
+			] =
+				true
+
+			HopButton.Text =
+				"RETRYING..."
+
+			task.wait(
+				HOP_RETRY_DELAY
+			)
+
 		end
 
-		hopping = false
+		hopping =
+			false
+
 		resetHopButton()
 
 	end)
@@ -3953,21 +4206,14 @@ end
 pcall(function()
 
 	TeleportService.TeleportInitFailed:
-		Connect(function(
-			player,
-			_,
-			_,
-			_,
-			_,
-			options
-		)
+		Connect(function(player)
 
 			if player ~= LP then
 				return
 			end
 
-			-- Allow an immediate new attempt.
-			hopping = false
+			hopping =
+				false
 
 			HopButton.Text =
 				"RETRYING..."
@@ -3990,11 +4236,9 @@ pcall(function()
 end)
 
 HopButton.MouseButton1Click:
-	Connect(function()
-
-		serverHop()
-
-	end)
+	Connect(
+		serverHop
+	)
 
 UserInputService.InputBegan:
 	Connect(function(
@@ -4057,9 +4301,11 @@ task.spawn(function()
 				and not manualAutoHopRestart
 			then
 
-				autoHopEnabled = false
+				autoHopEnabled =
+					false
 
-				Saved.AutoHop = false
+				Saved.AutoHop =
+					false
 
 				refreshButtons()
 				saveSettings()
@@ -4079,7 +4325,9 @@ task.spawn(function()
 
 		end
 
-		task.wait(0.05)
+		task.wait(
+			0.05
+		)
 
 	end
 
@@ -4107,7 +4355,9 @@ task.spawn(function()
 					or not data.Beam
 				then
 
-					removeESP(label)
+					removeESP(
+						label
+					)
 
 				else
 
@@ -4127,7 +4377,9 @@ task.spawn(function()
 
 		end
 
-		task.wait(0.25)
+		task.wait(
+			0.25
+		)
 
 	end
 
@@ -4177,7 +4429,8 @@ end
 LP.CharacterAdded:
 	Connect(function()
 
-		RootAttachment = nil
+		RootAttachment =
+			nil
 
 	end)
 
@@ -4189,7 +4442,9 @@ task.spawn(function()
 
 	while Gui.Parent do
 
-		task.wait(2)
+		task.wait(
+			2
+		)
 
 		Saved.MainMenuPosition =
 			savePos(

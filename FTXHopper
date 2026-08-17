@@ -1,5 +1,5 @@
 --========================================================
--- FTX ALL-IN-ONE - FIXED SERVER HOP
+-- FTX ALL-IN-ONE - ULTRA FAST SERVER HOP
 --========================================================
 
 if not game:IsLoaded() then
@@ -51,15 +51,13 @@ local GOOD_SOUND_ID =
 
 local MOBILE_MENU_SCALE = 0.5
 
--- Hopper settings
+--========================================================
+-- ULTRA FAST HOP SETTINGS
+--========================================================
 
+local HOP_RETRY_DELAY = 0.01
 local SERVER_PAGE_LIMIT = 100
-local SERVER_PAGES_PER_SEARCH = 10
-
-local HOP_WATCHDOG = 4
-local HOP_RETRY_DELAY = 0.15
-
-local MAX_RECENT_SERVERS = 50
+local MAX_RECENT_SERVERS = 75
 
 --========================================================
 -- SAVE DATA
@@ -178,7 +176,7 @@ local function saveSettings()
 
 end
 
--- LOAD IMMEDIATELY
+-- Load preferences immediately.
 loadSettings()
 
 --========================================================
@@ -1175,39 +1173,17 @@ end
 local function formatMoney(value)
 
 	if value >= 1e15 then
-
-		return string.format(
-			"$%.2fQ/s",
-			value / 1e15
-		)
-
+		return string.format("$%.2fQ/s", value / 1e15)
 	elseif value >= 1e12 then
-
-		return string.format(
-			"$%.2fT/s",
-			value / 1e12
-		)
-
+		return string.format("$%.2fT/s", value / 1e12)
 	elseif value >= 1e9 then
-
-		return string.format(
-			"$%.2fB/s",
-			value / 1e9
-		)
-
+		return string.format("$%.2fB/s", value / 1e9)
 	elseif value >= 1e6 then
-
-		return string.format(
-			"$%.2fM/s",
-			value / 1e6
-		)
-
+		return string.format("$%.2fM/s", value / 1e6)
 	end
 
 	return "$"
-		.. tostring(
-			math.floor(value)
-		)
+		.. tostring(math.floor(value))
 		.. "/s"
 
 end
@@ -1466,7 +1442,6 @@ local function createESP(label, data)
 			90
 		)
 
-	-- 65% transparent
 	text.TextTransparency = 0.65
 	text.TextStrokeTransparency = 0.65
 
@@ -1536,9 +1511,7 @@ local function checkMoney(obj)
 		not obj
 		or not obj.Parent
 	then
-
 		return
-
 	end
 
 	local value =
@@ -1621,9 +1594,7 @@ local function watchMoney(obj)
 		not obj:IsA("TextLabel")
 		and not obj:IsA("TextButton")
 	then
-
 		return
-
 	end
 
 	WatchedMoney[obj] = true
@@ -1826,7 +1797,7 @@ corner(
 local BrainrotList =
 	Instance.new(
 		"ScrollingFrame"
-		)
+	)
 
 BrainrotList.Position =
 	UDim2.new(
@@ -2231,7 +2202,7 @@ corner(
 local RadarList =
 	Instance.new(
 		"ScrollingFrame"
-		)
+	)
 
 RadarList.Position =
 	UDim2.new(
@@ -3489,11 +3460,12 @@ BrainrotClose.MouseButton1Click:
 	end)
 
 --========================================================
--- FIXED SERVER HOP
+-- ULTRA FAST SERVER HOP
 --========================================================
 
 local recentServers = {}
 local recentOrder = {}
+local failedServers = {}
 
 for _, id in ipairs(
 	Saved.RecentServers or {}
@@ -3502,7 +3474,6 @@ for _, id in ipairs(
 	if
 		type(id) == "string"
 		and id ~= ""
-		and id ~= game.JobId
 	then
 
 		recentServers[id] = true
@@ -3530,12 +3501,9 @@ local function addRecent(id)
 	if
 		not id
 		or id == ""
-		or id == game.JobId
 		or recentServers[id]
 	then
-
 		return
-
 	end
 
 	recentServers[id] = true
@@ -3556,13 +3524,18 @@ local function addRecent(id)
 				1
 			)
 
-		recentServers[removed] = nil
+		if removed then
+			recentServers[removed] = nil
+		end
 
 	end
 
 	saveRecent()
 
 end
+
+-- Current server is immediately protected.
+addRecent(game.JobId)
 
 local function removeRecent(id)
 
@@ -3589,30 +3562,21 @@ local function removeRecent(id)
 
 end
 
-local function clearRecentHistory()
-
-	recentServers = {}
-	recentOrder = {}
-
-	saveRecent()
-
-end
-
-local function httpGet(url)
+local function executorGet(url)
 
 	local success,
-		result =
+		body =
 		pcall(function()
 
 			return game:HttpGet(url)
 
 		end)
 
-	if success and result then
-		return result
+	if success and body then
+		return body
 	end
 
-	local requestFunction =
+	local req =
 		request
 		or http_request
 		or (
@@ -3620,13 +3584,13 @@ local function httpGet(url)
 			and syn.request
 		)
 
-	if type(requestFunction) == "function" then
+	if type(req) == "function" then
 
 		local ok,
 			response =
 			pcall(function()
 
-				return requestFunction({
+				return req({
 					Url = url,
 					Method = "GET"
 				})
@@ -3649,36 +3613,20 @@ local function httpGet(url)
 
 end
 
-local function fetchPage(
-	cursor,
-	order
-)
+local function fetchFastPage(order)
 
 	local url =
 		"https://games.roblox.com/v1/games/"
-		.. tostring(
-			TARGET_PLACE_ID
-		)
+		.. tostring(TARGET_PLACE_ID)
 		.. "/servers/Public?sortOrder="
-		.. order
+		.. tostring(order)
 		.. "&limit="
-		.. tostring(
-			SERVER_PAGE_LIMIT
-		)
+		.. tostring(SERVER_PAGE_LIMIT)
 
-	if cursor then
+	local raw =
+		executorGet(url)
 
-		url ..=
-			"&cursor="
-			.. HttpService:
-				UrlEncode(cursor)
-
-	end
-
-	local body =
-		httpGet(url)
-
-	if not body then
+	if not raw then
 		return nil
 	end
 
@@ -3688,149 +3636,190 @@ local function fetchPage(
 
 			return
 				HttpService:
-					JSONDecode(body)
+					JSONDecode(raw)
 
 		end)
 
-	if not ok then
+	if not ok or not data then
 		return nil
 	end
 
-	return data
+	return data.data or {}
 
 end
 
-local failedServers = {}
+local function chooseInstantServer()
 
-local function collectServers(
-	ignoreRecent
-)
+	-- Try ASC first.
+	local servers =
+		fetchFastPage("Asc")
 
-	local list = {}
-	local seen = {}
+	-- If request failed, instantly try Desc.
+	if not servers or #servers == 0 then
 
-	for _, order in ipairs({
-		"Asc",
-		"Desc"
-	}) do
+		servers =
+			fetchFastPage("Desc")
 
-		local cursor
+	end
 
-		for _ = 1, SERVER_PAGES_PER_SEARCH do
+	if not servers then
+		return nil
+	end
 
-			local page =
-				fetchPage(
-					cursor,
-					order
+	local fresh = {}
+	local fallback = {}
+
+	for _, server in ipairs(servers) do
+
+		local id =
+			server.id
+
+		local playing =
+			tonumber(
+				server.playing
+			)
+
+		local maxPlayers =
+			tonumber(
+				server.maxPlayers
+			)
+
+		if
+			id
+			and id ~= ""
+			and id ~= game.JobId
+			and not failedServers[id]
+			and playing
+			and maxPlayers
+			and playing < maxPlayers
+		then
+
+			-- Preferred:
+			-- never used recently.
+			if not recentServers[id] then
+
+				table.insert(
+					fresh,
+					id
 				)
 
-			if not page then
-				break
-			end
+			else
 
-			for _, server in ipairs(
-				page.data or {}
-			) do
-
-				local id =
-					server.id
-
-				local playing =
-					tonumber(
-						server.playing
-					)
-
-				local maxPlayers =
-					tonumber(
-						server.maxPlayers
-					)
-
-				if
+				-- Backup only if every visible
+				-- server has already been visited.
+				table.insert(
+					fallback,
 					id
-					and id ~= ""
-					and id ~= game.JobId
-					and not seen[id]
-					and not failedServers[id]
-					and (
-						ignoreRecent
-						or not recentServers[id]
-					)
-					and playing
-					and maxPlayers
-					and playing < maxPlayers
-				then
+				)
 
-					seen[id] = true
-
-					table.insert(
-						list,
-						server
-					)
-
-				end
-
-			end
-
-			cursor =
-				page.nextPageCursor
-
-			if not cursor then
-				break
-			end
-
-			if #list >= 100 then
-				break
 			end
 
 		end
 
 	end
 
-	return list
+	if #fresh > 0 then
 
-end
-
-local function chooseServer()
-
-	-- First try servers we haven't recently used.
-
-	local servers =
-		collectServers(false)
-
-	if #servers > 0 then
-
-		return
-			servers[
-				RNG:NextInteger(
-					1,
-					#servers
-				)
-			]
+		return fresh[
+			RNG:NextInteger(
+				1,
+				#fresh
+			)
+		]
 
 	end
 
-	-- IMPORTANT FIX:
-	--
-	-- If recent history filtered everything,
-	-- clear the old history and search again.
-	--
-	-- CURRENT SERVER IS STILL EXCLUDED because
-	-- collectServers checks id ~= game.JobId.
+	-- If first page only contains recent servers,
+	-- try opposite ordering immediately.
+	local second =
+		fetchFastPage("Desc")
 
-	clearRecentHistory()
+	if second then
 
-	servers =
-		collectServers(true)
+		for _, server in ipairs(second) do
 
-	if #servers > 0 then
+			local id =
+				server.id
 
-		return
-			servers[
-				RNG:NextInteger(
-					1,
-					#servers
+			local playing =
+				tonumber(
+					server.playing
 				)
-			]
+
+			local maxPlayers =
+				tonumber(
+					server.maxPlayers
+				)
+
+			if
+				id
+				and id ~= ""
+				and id ~= game.JobId
+				and not failedServers[id]
+				and not recentServers[id]
+				and playing
+				and maxPlayers
+				and playing < maxPlayers
+			then
+
+				table.insert(
+					fresh,
+					id
+				)
+
+			end
+
+		end
+
+	end
+
+	if #fresh > 0 then
+
+		return fresh[
+			RNG:NextInteger(
+				1,
+				#fresh
+			)
+		]
+
+	end
+
+	-- Never pick current JobId.
+	-- Old entries are rotated only when needed.
+	if #fallback > 0 then
+
+		local removeCount =
+			math.max(
+				1,
+				math.floor(
+					#recentOrder / 2
+				)
+			)
+
+		for _ = 1, removeCount do
+
+			local old =
+				table.remove(
+					recentOrder,
+					1
+				)
+
+			if old and old ~= game.JobId then
+
+				recentServers[old] = nil
+
+			elseif old == game.JobId then
+
+				table.insert(
+					recentOrder,
+					old
+				)
+
+			end
+
+		end
+
+		saveRecent()
 
 	end
 
@@ -3855,6 +3844,12 @@ local function serverHop()
 
 	hopping = true
 
+	HopButton.Text =
+		"HOPPING..."
+
+	HopButton.TextSize =
+		14
+
 	task.spawn(function()
 
 		while
@@ -3862,42 +3857,36 @@ local function serverHop()
 			and hopping
 		do
 
-			HopButton.Text =
-				"FINDING..."
+			-- No giant page scan.
+			-- Immediately request first page.
+			local serverId =
+				chooseInstantServer()
 
-			HopButton.TextSize =
-				14
-
-			local target =
-				chooseServer()
-
-			if not target then
-
-				-- API gave us nothing at all.
-				-- Do another clean request shortly.
+			if not serverId then
 
 				HopButton.Text =
-					"SEARCHING..."
+					"FINDING..."
 
-				task.wait(0.35)
+				task.wait(
+					HOP_RETRY_DELAY
+				)
 
 				continue
 
 			end
 
-			local id =
-				target.id
-
-			-- HARD CHECK:
-			-- NEVER TELEPORT TO CURRENT JOB ID
-
+			-- HARD PROTECTION.
 			if
-				not id
-				or id == ""
-				or id == game.JobId
+				serverId
+				== game.JobId
 			then
 
+				failedServers[
+					serverId
+				] = true
+
 				task.wait()
+
 				continue
 
 			end
@@ -3905,15 +3894,7 @@ local function serverHop()
 			HopButton.Text =
 				"HOPPING..."
 
-			local originalJob =
-				game.JobId
-
-			-- Temporarily save this target so the next
-			-- instance knows where we just went.
-
-			addRecent(id)
-
-			local started =
+			local success =
 				pcall(function()
 
 					TeleportService:
@@ -3921,7 +3902,7 @@ local function serverHop()
 
 							TARGET_PLACE_ID,
 
-							id,
+							serverId,
 
 							LP
 
@@ -3929,73 +3910,34 @@ local function serverHop()
 
 				end)
 
-			if not started then
+			if success then
 
-				-- Critical fix:
-				-- failed teleport is NOT considered visited
-
-				removeRecent(id)
-
-				failedServers[id] =
-					true
-
-				HopButton.Text =
-					"RETRYING..."
-
-				task.wait(
-					HOP_RETRY_DELAY
+				-- Save after Roblox accepted the
+				-- teleport request.
+				addRecent(
+					serverId
 				)
 
-				continue
-
-			end
-
-			local watchdog =
-				os.clock()
-
-			while
-				Gui.Parent
-				and hopping
-				and os.clock() - watchdog
-					< HOP_WATCHDOG
-			do
-
-				if
-					game.JobId
-					~= originalJob
-				then
-
-					return
-
-				end
-
-				task.wait(0.05)
-
-			end
-
-			-- Teleport call succeeded but Roblox
-			-- left us in the same server.
-
-			if
-				game.JobId
-				== originalJob
-			then
-
-				removeRecent(id)
-
-				failedServers[id] =
-					true
-
-				HopButton.Text =
-					"RETRYING..."
-
-				task.wait(
-					HOP_RETRY_DELAY
-				)
+				-- Do not sit around with a long watchdog.
+				-- Roblox now owns the transition.
+				return
 
 			else
 
-				return
+				failedServers[
+					serverId
+				] = true
+
+				removeRecent(
+					serverId
+				)
+
+				HopButton.Text =
+					"RETRYING..."
+
+				task.wait(
+					HOP_RETRY_DELAY
+				)
 
 			end
 
@@ -4008,25 +3950,51 @@ local function serverHop()
 
 end
 
--- Roblox teleport failure event
-
 pcall(function()
 
 	TeleportService.TeleportInitFailed:
-		Connect(function(player)
+		Connect(function(
+			player,
+			_,
+			_,
+			_,
+			_,
+			options
+		)
 
 			if player ~= LP then
 				return
 			end
 
-			-- Watchdog handles retry automatically.
+			-- Allow an immediate new attempt.
+			hopping = false
+
+			HopButton.Text =
+				"RETRYING..."
+
+			task.delay(
+				HOP_RETRY_DELAY,
+				function()
+
+					resetHopButton()
+
+					if autoHopEnabled then
+						serverHop()
+					end
+
+				end
+			)
 
 		end)
 
 end)
 
 HopButton.MouseButton1Click:
-	Connect(serverHop)
+	Connect(function()
+
+		serverHop()
+
+	end)
 
 UserInputService.InputBegan:
 	Connect(function(
@@ -4056,7 +4024,8 @@ UserInputService.InputBegan:
 local function waitInitialSecond()
 
 	local elapsed =
-		os.clock() - JOIN_TIME
+		os.clock()
+		- JOIN_TIME
 
 	if elapsed < AUTO_HOP_JOIN_WAIT then
 
@@ -4077,7 +4046,6 @@ task.spawn(function()
 
 		if autoHopEnabled then
 
-			-- Fast refresh before making the decision.
 			scanMoney()
 
 			local found,
@@ -4105,23 +4073,20 @@ task.spawn(function()
 
 			elseif not hopping then
 
-				-- If YOU manually turn Auto Hop back ON
-				-- in a good server, leave it anyway.
-
 				serverHop()
 
 			end
 
 		end
 
-		task.wait(0.15)
+		task.wait(0.05)
 
 	end
 
 end)
 
 --========================================================
--- KEEP LINES ATTACHED AFTER RESPAWN
+-- KEEP LINES ATTACHED
 --========================================================
 
 task.spawn(function()
@@ -4268,6 +4233,9 @@ task.spawn(function()
 		Saved.PlayerHighlight =
 			playerHighlightEnabled
 
+		Saved.RecentServers =
+			recentOrder
+
 		saveSettings()
 
 	end
@@ -4279,3 +4247,13 @@ end)
 --========================================================
 
 refreshButtons()
+
+print("[FTX] LOADED")
+print("[FTX] AUTO HOP WAIT = 1 SECOND")
+print("[FTX] ULTRA FAST SERVER LOOKUP = ON")
+print("[FTX] MULTI-PAGE PRE-SCAN = OFF")
+print("[FTX] LONG TELEPORT WATCHDOG = OFF")
+print("[FTX] CURRENT SERVER =", game.JobId)
+print("[FTX] CURRENT SERVER REJOIN PROTECTION = ON")
+print("[FTX] $20M SOUND =", GOOD_SOUND_ID)
+print("[FTX] SETTINGS SAVE =", canSave)

@@ -1,5 +1,5 @@
 --========================================================
--- FTX ALL-IN-ONE - FAST DIFFERENT SERVER HOP
+-- FTX ALL-IN-ONE - COMPLETELY RANDOM FAST SERVER HOP
 --========================================================
 
 if not game:IsLoaded() then
@@ -52,11 +52,11 @@ local GOOD_SOUND_ID =
 local MOBILE_MENU_SCALE = 0.5
 
 --========================================================
--- FAST HOP SETTINGS
+-- FAST RANDOM HOP SETTINGS
 --========================================================
 
 local HOP_RETRY_DELAY = 0.05
-local MAX_RECENT_SERVERS = 12
+local SERVER_PAGE_LIMIT = 100
 
 --========================================================
 -- SAVE DATA
@@ -76,8 +76,6 @@ local Saved = {
 	MainMenuOpen = true,
 	RadarMenuOpen = true,
 	BrainrotMenuOpen = true,
-
-	RecentServers = {},
 
 	MainMenuPosition = {
 		XScale = 0,
@@ -175,7 +173,6 @@ local function saveSettings()
 
 end
 
--- load FTX data immediately
 loadSettings()
 
 --========================================================
@@ -326,10 +323,8 @@ local function makeDraggable(
 	handle.InputBegan:Connect(function(input)
 
 		if
-			input.UserInputType
-				== Enum.UserInputType.MouseButton1
-			or input.UserInputType
-				== Enum.UserInputType.Touch
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
 		then
 
 			dragging = true
@@ -343,10 +338,8 @@ local function makeDraggable(
 	handle.InputEnded:Connect(function(input)
 
 		if
-			input.UserInputType
-				== Enum.UserInputType.MouseButton1
-			or input.UserInputType
-				== Enum.UserInputType.Touch
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
 		then
 
 			if dragging then
@@ -377,10 +370,8 @@ local function makeDraggable(
 		end
 
 		if
-			input.UserInputType
-				~= Enum.UserInputType.MouseMovement
-			and input.UserInputType
-				~= Enum.UserInputType.Touch
+			input.UserInputType ~= Enum.UserInputType.MouseMovement
+			and input.UserInputType ~= Enum.UserInputType.Touch
 		then
 
 			return
@@ -627,8 +618,7 @@ task.spawn(function()
 
 				{
 					Rotation =
-						HopGradient.Rotation
-						+ 360
+						HopGradient.Rotation + 360
 				}
 
 			)
@@ -1511,7 +1501,6 @@ local function createESP(label, data)
 			90
 		)
 
-	-- 65% transparent
 	text.TextTransparency = 0.65
 	text.TextStrokeTransparency = 0.65
 
@@ -3738,117 +3727,11 @@ BrainrotClose.MouseButton1Click:
 	end)
 
 --========================================================
--- FAST DIFFERENT SERVER HOP
+-- COMPLETELY RANDOM FAST SERVER HOP
 --========================================================
 
-local recentServers = {}
-local recentOrder = {}
+local hopping = false
 local failedServers = {}
-
-for _, id in ipairs(
-	Saved.RecentServers or {}
-) do
-
-	if
-		type(id) == "string"
-		and id ~= ""
-		and id ~= game.JobId
-	then
-
-		recentServers[id] =
-			true
-
-		table.insert(
-			recentOrder,
-			id
-		)
-
-	end
-
-end
-
-while
-	#recentOrder
-	> MAX_RECENT_SERVERS
-do
-
-	local old =
-		table.remove(
-			recentOrder,
-			1
-		)
-
-	if old then
-
-		recentServers[old] =
-			nil
-
-	end
-
-end
-
-local function saveRecent()
-
-	Saved.RecentServers =
-		recentOrder
-
-	saveSettings()
-
-end
-
-local function rememberServer(id)
-
-	if
-		not id
-		or id == ""
-		or id == game.JobId
-		or recentServers[id]
-	then
-
-		return
-
-	end
-
-	recentServers[id] =
-		true
-
-	table.insert(
-		recentOrder,
-		id
-	)
-
-	while
-		#recentOrder
-		> MAX_RECENT_SERVERS
-	do
-
-		local old =
-			table.remove(
-				recentOrder,
-				1
-			)
-
-		if old then
-
-			recentServers[old] =
-				nil
-
-		end
-
-	end
-
-	saveRecent()
-
-end
-
-local function clearRecent()
-
-	recentServers = {}
-	recentOrder = {}
-
-	saveRecent()
-
-end
 
 local function executorGet(url)
 
@@ -3904,7 +3787,15 @@ local function executorGet(url)
 
 end
 
-local function fetchServers(order)
+local function getRandomServer()
+
+	local order =
+		RNG:NextInteger(
+			1,
+			2
+		) == 1
+		and "Asc"
+		or "Desc"
 
 	local url =
 		"https://games.roblox.com/v1/games/"
@@ -3913,7 +3804,10 @@ local function fetchServers(order)
 		)
 		.. "/servers/Public?sortOrder="
 		.. tostring(order)
-		.. "&limit=100"
+		.. "&limit="
+		.. tostring(
+			SERVER_PAGE_LIMIT
+		)
 
 	local body =
 		executorGet(
@@ -3936,29 +3830,20 @@ local function fetchServers(order)
 
 		end)
 
-	if not ok or not data then
+	if
+		not ok
+		or not data
+		or not data.data
+	then
+
 		return nil
+
 	end
 
-	return
-		data.data
-		or {}
-
-end
-
-local function pickServerFromPage(
-	servers,
-	ignoreRecent
-)
-
-	if not servers then
-		return nil
-	end
-
-	local candidates = {}
+	local choices = {}
 
 	for _, server in ipairs(
-		servers
+		data.data
 	) do
 
 		local id =
@@ -3982,14 +3867,10 @@ local function pickServerFromPage(
 			and playing
 			and maxPlayers
 			and playing < maxPlayers
-			and (
-				ignoreRecent
-				or not recentServers[id]
-			)
 		then
 
 			table.insert(
-				candidates,
+				choices,
 				id
 			)
 
@@ -3997,101 +3878,20 @@ local function pickServerFromPage(
 
 	end
 
-	if #candidates == 0 then
+	if #choices == 0 then
 		return nil
 	end
 
 	return
-		candidates[
+		choices[
 			RNG:
 				NextInteger(
 					1,
-					#candidates
+					#choices
 				)
 		]
 
 end
-
-local function getDifferentServer()
-
-	-- randomize which server ordering we use first
-	-- so repeated hops don't always see the exact same page first
-
-	local firstOrder =
-		RNG:NextInteger(
-			1,
-			2
-		) == 1
-		and "Asc"
-		or "Desc"
-
-	local secondOrder =
-		firstOrder == "Asc"
-		and "Desc"
-		or "Asc"
-
-	-- first page
-	local firstPage =
-		fetchServers(
-			firstOrder
-		)
-
-	local serverId =
-		pickServerFromPage(
-			firstPage,
-			false
-		)
-
-	if serverId then
-		return serverId
-	end
-
-	-- opposite page
-	local secondPage =
-		fetchServers(
-			secondOrder
-		)
-
-	serverId =
-		pickServerFromPage(
-			secondPage,
-			false
-		)
-
-	if serverId then
-		return serverId
-	end
-
-	-- if the tiny recent history is blocking everything,
-	-- delete the history instead of searching for 30 seconds
-
-	clearRecent()
-
-	serverId =
-		pickServerFromPage(
-			firstPage,
-			true
-		)
-
-	if serverId then
-		return serverId
-	end
-
-	serverId =
-		pickServerFromPage(
-			secondPage,
-			true
-		)
-
-	if serverId then
-		return serverId
-	end
-
-	return nil
-
-end
-
-local hopping = false
 
 local function resetHopButton()
 
@@ -4111,6 +3911,12 @@ local function serverHop()
 
 	hopping = true
 
+	HopButton.Text =
+		"HOPPING..."
+
+	HopButton.TextSize =
+		14
+
 	task.spawn(function()
 
 		while
@@ -4118,14 +3924,8 @@ local function serverHop()
 			and hopping
 		do
 
-			HopButton.Text =
-				"HOPPING..."
-
-			HopButton.TextSize =
-				14
-
 			local serverId =
-				getDifferentServer()
+				getRandomServer()
 
 			if not serverId then
 
@@ -4140,7 +3940,6 @@ local function serverHop()
 
 			end
 
-			-- hard current-server check
 			if serverId == game.JobId then
 
 				failedServers[
@@ -4154,7 +3953,10 @@ local function serverHop()
 
 			end
 
-			local success =
+			HopButton.Text =
+				"HOPPING..."
+
+			local ok =
 				pcall(function()
 
 					TeleportService:
@@ -4170,12 +3972,10 @@ local function serverHop()
 
 				end)
 
-			if success then
+			if ok then
 
-				rememberServer(
-					serverId
-				)
-
+				-- Roblox accepted teleport request.
+				-- No extra artificial delay here.
 				return
 
 			end
@@ -4487,9 +4287,6 @@ task.spawn(function()
 
 		Saved.PlayerHighlight =
 			playerHighlightEnabled
-
-		Saved.RecentServers =
-			recentOrder
 
 		saveSettings()
 

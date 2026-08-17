@@ -1,8 +1,6 @@
 --========================================================
 -- FTX ALL-IN-ONE
--- FAST MATCHMAKING HOP
--- AUTO HOP = 10 SECOND JOIN DELAY
--- STOP AUTO HOP ON $20M+/SEC
+-- FIXED HOP + FIXED AUTO HOP
 --========================================================
 
 if not game:IsLoaded() then
@@ -20,13 +18,13 @@ local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
 local SoundService = game:GetService("SoundService")
-local StarterGui = game:GetService("StarterGui")
 local CoreGui = game:GetService("CoreGui")
 
 local LP = Players.LocalPlayer
 local PlayerGui = LP:WaitForChild("PlayerGui")
 
 local JOIN_TIME = os.clock()
+local RNG = Random.new()
 
 --========================================================
 -- CONFIG
@@ -40,8 +38,6 @@ local MIN_MONEY = 20_000_000
 local GREEN_RANGE = 30
 local RED_RANGE = 20
 
--- CHANGED:
--- Auto hopper waits 10 seconds after joining.
 local AUTO_HOP_JOIN_WAIT = 10
 
 local MONEY_SCAN_INTERVAL = 5
@@ -56,6 +52,8 @@ local GOOD_SOUND_ID =
 	"rbxassetid://103185549195508"
 
 local MOBILE_MENU_SCALE = 0.5
+
+local HOP_RETRY_DELAY = 0.25
 
 --========================================================
 -- SAVE DATA
@@ -169,9 +167,7 @@ local function saveSettings()
 
 		writefile(
 			SAVE_FILE,
-			HttpService:JSONEncode(
-				Saved
-			)
+			HttpService:JSONEncode(Saved)
 		)
 
 	end)
@@ -202,19 +198,10 @@ local function loadPos(data, fallback)
 	end
 
 	return UDim2.new(
-
-		tonumber(data.XScale)
-			or fallback.X.Scale,
-
-		tonumber(data.XOffset)
-			or fallback.X.Offset,
-
-		tonumber(data.YScale)
-			or fallback.Y.Scale,
-
-		tonumber(data.YOffset)
-			or fallback.Y.Offset
-
+		tonumber(data.XScale) or fallback.X.Scale,
+		tonumber(data.XOffset) or fallback.X.Offset,
+		tonumber(data.YScale) or fallback.Y.Scale,
+		tonumber(data.YOffset) or fallback.Y.Offset
 	)
 
 end
@@ -259,10 +246,7 @@ local Gui =
 Gui.Name = "FTX_AllInOne"
 Gui.ResetOnSpawn = false
 Gui.IgnoreGuiInset = true
-
-Gui.ZIndexBehavior =
-	Enum.ZIndexBehavior.Sibling
-
+Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 Gui.Parent = CoreGui
 
 local WorldFolder =
@@ -336,27 +320,6 @@ local function addScale(
 	object.Parent = parent
 
 	return object
-
-end
-
-local function notify(
-	title,
-	text,
-	duration
-)
-
-	pcall(function()
-
-		StarterGui:SetCore(
-			"SendNotification",
-			{
-				Title = title,
-				Text = text,
-				Duration = duration or 3
-			}
-		)
-
-	end)
 
 end
 
@@ -479,9 +442,10 @@ local function getRoot()
 		return nil
 	end
 
-	return character:FindFirstChild(
-		"HumanoidRootPart"
-	)
+	return character:
+		FindFirstChild(
+			"HumanoidRootPart"
+		)
 
 end
 
@@ -735,7 +699,7 @@ MainMenu.Size =
 		0,
 		285,
 		0,
-		500
+		445
 	)
 
 MainMenu.BackgroundColor3 =
@@ -982,9 +946,7 @@ Controls.CanvasSize =
 	UDim2.new()
 
 Controls.ScrollBarThickness = 3
-
-Controls.Parent =
-	MainMenu
+Controls.Parent = MainMenu
 
 local ControlLayout =
 	Instance.new(
@@ -1076,13 +1038,6 @@ local AutoHopButton,
 	AutoHopStroke =
 	makeControl(
 		"AUTO HOP"
-	)
-
--- NEW BUTTON
-local TpHereButton,
-	TpHereStroke =
-	makeControl(
-		"TP HERE"
 	)
 
 local RadarCircleButton,
@@ -1271,7 +1226,8 @@ local function parseMoney(text)
 	end
 
 	return
-		number * multiplier
+		number
+		* multiplier
 
 end
 
@@ -1281,7 +1237,8 @@ end
 
 local function getWorldPart(obj)
 
-	local current = obj
+	local current =
+		obj
 
 	for _ = 1, 20 do
 
@@ -1468,8 +1425,7 @@ local function hasGoodBrainrot()
 			and label.Parent
 			and data
 			and data.Value
-			and data.Value
-				>= MIN_MONEY
+			and data.Value >= MIN_MONEY
 			and data.Part
 			and data.Part.Parent
 		then
@@ -1568,7 +1524,6 @@ local function createESP(
 			90
 		)
 
-	-- 65% transparent
 	text.TextTransparency = 0.65
 	text.TextStrokeTransparency = 0.65
 
@@ -1622,10 +1577,12 @@ local function createESP(
 		WorldFolder
 
 	BrainrotESP[label] = {
+
 		Gui = billboard,
 		Label = text,
 		Attachment = attachment,
 		Beam = beam
+
 	}
 
 end
@@ -1636,9 +1593,11 @@ local function stopAutoHop()
 		return
 	end
 
-	autoHopEnabled = false
+	autoHopEnabled =
+		false
 
-	Saved.AutoHop = false
+	Saved.AutoHop =
+		false
 
 	if refreshButtons then
 		refreshButtons()
@@ -1664,8 +1623,11 @@ local function checkMoney(obj)
 
 	if not value then
 
-		MoneyTargets[obj] = nil
-		announced[obj] = nil
+		MoneyTargets[obj] =
+			nil
+
+		announced[obj] =
+			nil
 
 		removeESP(obj)
 
@@ -1725,8 +1687,7 @@ local function checkMoney(obj)
 
 		end
 
-		-- CRITICAL:
-		-- Anything $20M+ instantly disables Auto Hop.
+		-- AUTO HOP STOPS THE MOMENT $20M+ EXISTS.
 		stopAutoHop()
 
 	else
@@ -1796,8 +1757,12 @@ local function scanMoney()
 
 		end
 
-		if index % 600 == 0 then
+		if
+			index % 600 == 0
+		then
+
 			task.wait()
+
 		end
 
 	end
@@ -1922,9 +1887,7 @@ BrainrotTitle.Font =
 	Enum.Font.GothamBlack
 
 BrainrotTitle.TextSize = 15
-
-BrainrotTitle.Parent =
-	BrainrotPanel
+BrainrotTitle.Parent = BrainrotPanel
 
 local BrainrotClose =
 	Instance.new(
@@ -1974,9 +1937,7 @@ BrainrotClose.Font =
 	Enum.Font.GothamBlack
 
 BrainrotClose.TextSize = 20
-
-BrainrotClose.Parent =
-	BrainrotPanel
+BrainrotClose.Parent = BrainrotPanel
 
 corner(
 	BrainrotClose,
@@ -2014,9 +1975,7 @@ BrainrotList.CanvasSize =
 	UDim2.new()
 
 BrainrotList.ScrollBarThickness = 3
-
-BrainrotList.Parent =
-	BrainrotPanel
+BrainrotList.Parent = BrainrotPanel
 
 local BrainrotLayout =
 	Instance.new(
@@ -2086,9 +2045,7 @@ local function selectBrainrot(data)
 		or not data.Part
 		or not data.Part.Parent
 	then
-
 		return
-
 	end
 
 	SelectedAttachment =
@@ -2157,8 +2114,7 @@ local function refreshBrainrotList()
 			label
 			and label.Parent
 			and data
-			and data.Value
-				>= MIN_MONEY
+			and data.Value >= MIN_MONEY
 			and data.Part
 			and data.Part.Parent
 		then
@@ -2236,9 +2192,7 @@ local function refreshBrainrotList()
 			Enum.Font.GothamBold
 
 		row.TextSize = 12
-
-		row.Parent =
-			BrainrotList
+		row.Parent = BrainrotList
 
 		corner(
 			row,
@@ -2358,7 +2312,6 @@ RadarTitle.Size =
 
 RadarTitle.BackgroundTransparency = 1
 RadarTitle.AutoButtonColor = false
-
 RadarTitle.Text = "RADAR"
 
 RadarTitle.TextColor3 =
@@ -2409,7 +2362,6 @@ RadarClose.BackgroundColor3 =
 	)
 
 RadarClose.BorderSizePixel = 0
-
 RadarClose.Text = "×"
 
 RadarClose.TextColor3 =
@@ -2423,9 +2375,7 @@ RadarClose.Font =
 	Enum.Font.GothamBlack
 
 RadarClose.TextSize = 20
-
-RadarClose.Parent =
-	RadarPanel
+RadarClose.Parent = RadarPanel
 
 corner(
 	RadarClose,
@@ -2463,9 +2413,7 @@ RadarList.CanvasSize =
 	UDim2.new()
 
 RadarList.ScrollBarThickness = 3
-
-RadarList.Parent =
-	RadarPanel
+RadarList.Parent = RadarPanel
 
 local RadarLayout =
 	Instance.new(
@@ -2510,7 +2458,9 @@ RadarClose.MouseButton1Click:
 --========================================================
 
 local RadarCircle =
-	Instance.new("Part")
+	Instance.new(
+		"Part"
+	)
 
 RadarCircle.Name =
 	"FTX_RADAR_CIRCLE"
@@ -3188,9 +3138,7 @@ local function checkStole(text)
 		not autoKickEnabled
 		or kickTriggered
 	then
-
 		return
-
 	end
 
 	if typeof(text) ~= "string" then
@@ -3232,9 +3180,7 @@ local function watchUI(obj)
 			"TextButton"
 		)
 	then
-
 		return
-
 	end
 
 	watchedUI[obj] =
@@ -3320,9 +3266,7 @@ local function isStealPrompt(prompt)
 		or not prompt.Parent
 		or not prompt.Enabled
 	then
-
 		return false
-
 	end
 
 	local action =
@@ -3359,9 +3303,7 @@ local function promptPosition(prompt)
 		not prompt
 		or not prompt.Parent
 	then
-
 		return nil
-
 	end
 
 	if
@@ -3465,10 +3407,8 @@ local function getNearestPrompt()
 				or 10
 
 			if
-				distance
-					<= activation + 0.75
-				and distance
-					< bestDistance
+				distance <= activation + 0.75
+				and distance < bestDistance
 			then
 
 				best =
@@ -3567,8 +3507,7 @@ local function getHighestPrompt()
 				or 10
 
 			if
-				distance
-					<= activation + 0.75
+				distance <= activation + 0.75
 			then
 
 				local money =
@@ -3578,8 +3517,7 @@ local function getHighestPrompt()
 
 				if
 					money
-					and money
-						> bestMoney
+					and money > bestMoney
 				then
 
 					bestMoney =
@@ -3609,9 +3547,7 @@ local function holdPrompt(prompt)
 		or not prompt
 		or not prompt.Parent
 	then
-
 		return
-
 	end
 
 	stealing = true
@@ -3749,23 +3685,6 @@ refreshButtons =
 			BrainrotPanel.Visible
 		)
 
-		TpHereButton.Text =
-			"TP HERE"
-
-		TpHereButton.TextColor3 =
-			Color3.fromRGB(
-				255,
-				220,
-				60
-			)
-
-		TpHereStroke.Color =
-			Color3.fromRGB(
-				255,
-				170,
-				25
-			)
-
 	end
 
 --========================================================
@@ -3779,10 +3698,7 @@ NearestButton.MouseButton1Click:
 			not nearestEnabled
 
 		if nearestEnabled then
-
-			highestEnabled =
-				false
-
+			highestEnabled = false
 		end
 
 		Saved.NearestSteal =
@@ -3803,10 +3719,7 @@ HighestButton.MouseButton1Click:
 			not highestEnabled
 
 		if highestEnabled then
-
-			nearestEnabled =
-				false
-
+			nearestEnabled = false
 		end
 
 		Saved.HighestMoney =
@@ -3837,13 +3750,6 @@ AutoKickButton.MouseButton1Click:
 
 	end)
 
---========================================================
--- AUTO HOP BUTTON
---
--- CRITICAL CHANGE:
--- Pressing ON while $20M+ exists immediately turns it OFF.
---========================================================
-
 AutoHopButton.MouseButton1Click:
 	Connect(function()
 
@@ -3862,7 +3768,7 @@ AutoHopButton.MouseButton1Click:
 
 		end
 
-		-- Scan BEFORE allowing Auto Hop to turn on.
+		-- Scan BEFORE enabling it.
 		scanMoney()
 
 		local found =
@@ -3876,40 +3782,18 @@ AutoHopButton.MouseButton1Click:
 			Saved.AutoHop =
 				false
 
-			refreshButtons()
-			saveSettings()
+		else
 
-			return
+			autoHopEnabled =
+				true
+
+			Saved.AutoHop =
+				true
 
 		end
 
-		autoHopEnabled =
-			true
-
-		Saved.AutoHop =
-			true
-
 		refreshButtons()
 		saveSettings()
-
-	end)
-
---========================================================
--- TP HERE
---
--- A client script has no built-in cross-server broadcast.
--- A relay/server MessagingService is required for other
--- servers to learn this server's destination.
---========================================================
-
-TpHereButton.MouseButton1Click:
-	Connect(function()
-
-		notify(
-			"FTX TP HERE",
-			"Cross-server TP HERE needs a shared relay/server-side MessagingService.",
-			5
-		)
 
 	end)
 
@@ -3969,31 +3853,8 @@ BrainrotMenuButton.MouseButton1Click:
 
 	end)
 
-RadarClose.MouseButton1Click:
-	Connect(function()
-
-		task.defer(
-			refreshButtons
-		)
-
-	end)
-
-BrainrotClose.MouseButton1Click:
-	Connect(function()
-
-		task.defer(
-			refreshButtons
-		)
-
-	end)
-
 --========================================================
--- FAST NORMAL SERVER HOP
---
--- NO SERVER API SEARCH.
--- NO LOOP THROUGH PUBLIC SERVER PAGES.
--- NO RECENT JOB HISTORY.
--- TELEPORT REQUEST IS SENT IMMEDIATELY.
+-- FIXED SERVER HOP
 --========================================================
 
 local hopping = false
@@ -4014,7 +3875,8 @@ local function serverHop()
 		return
 	end
 
-	hopping = true
+	hopping =
+		true
 
 	HopButton.Text =
 		"HOPPING..."
@@ -4024,24 +3886,20 @@ local function serverHop()
 
 	task.spawn(function()
 
-		local options =
-			Instance.new(
-				"TeleportOptions"
-			)
-
-		local success =
+		local ok =
 			pcall(function()
 
+				-- Normal Roblox matchmaking.
+				-- No server-page HTTP scan.
 				TeleportService:
-					TeleportAsync(
+					Teleport(
 						TARGET_PLACE_ID,
-						{LP},
-						options
+						LP
 					)
 
 			end)
 
-		if not success then
+		if not ok then
 
 			hopping =
 				false
@@ -4051,11 +3909,16 @@ local function serverHop()
 			if autoHopEnabled then
 
 				task.delay(
-					0.1,
+					HOP_RETRY_DELAY,
 					function()
 
-						if autoHopEnabled then
+						if
+							autoHopEnabled
+							and Gui.Parent
+						then
+
 							serverHop()
+
 						end
 
 					end
@@ -4090,11 +3953,16 @@ pcall(function()
 			if autoHopEnabled then
 
 				task.delay(
-					0.1,
+					HOP_RETRY_DELAY,
 					function()
 
-						if autoHopEnabled then
+						if
+							autoHopEnabled
+							and Gui.Parent
+						then
+
 							serverHop()
+
 						end
 
 					end
@@ -4141,61 +4009,45 @@ UserInputService.InputBegan:
 --========================================================
 -- AUTO HOP
 --
--- Wait exactly 10 seconds after joining.
---
--- If $20M+ exists:
--- AUTO HOP OFF.
---
--- If $20M+ appears later:
--- checkMoney() also instantly turns AUTO HOP OFF.
+-- 10 SECOND JOIN DELAY
+-- $20M+ = DO NOT HOP
 --========================================================
 
-local function waitForAutoHopDelay()
-
-	local elapsed =
-		os.clock()
-		- JOIN_TIME
-
-	if
-		elapsed
-		< AUTO_HOP_JOIN_WAIT
-	then
-
-		task.wait(
-			AUTO_HOP_JOIN_WAIT
-			- elapsed
-		)
-
-	end
-
-end
-
 task.spawn(function()
-
-	waitForAutoHopDelay()
 
 	while Gui.Parent do
 
 		if autoHopEnabled then
 
-			-- Check right before every possible hop.
-			scanMoney()
+			local elapsed =
+				os.clock()
+				- JOIN_TIME
 
-			local found =
-				hasGoodBrainrot()
+			if
+				elapsed
+				>= AUTO_HOP_JOIN_WAIT
+			then
 
-			if found then
+				-- Always scan immediately before hop.
+				scanMoney()
 
-				stopAutoHop()
+				local found =
+					hasGoodBrainrot()
 
-				hopping =
-					false
+				if found then
 
-				resetHopButton()
+					stopAutoHop()
 
-			elseif not hopping then
+					hopping =
+						false
 
-				serverHop()
+					resetHopButton()
+
+				elseif not hopping then
+
+					serverHop()
+
+				end
 
 			end
 
@@ -4210,10 +4062,7 @@ task.spawn(function()
 end)
 
 --========================================================
--- EXTRA FAST $20M GUARD
---
--- This watches the already-known targets constantly so
--- Auto Hop cannot stay ON after a good target exists.
+-- EXTRA $20M WATCH
 --========================================================
 
 task.spawn(function()
@@ -4421,9 +4270,6 @@ end)
 --========================================================
 
 refreshButtons()
-
--- If Auto Hop was saved ON from an older session,
--- immediately kill it if this server already has $20M+.
 
 task.spawn(function()
 

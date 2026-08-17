@@ -1,6 +1,6 @@
 --========================================================
 -- FTX ALL-IN-ONE
--- NORMAL FAST ROBLOX SERVER HOP
+-- RANDOM JOBID SERVER HOP
 --========================================================
 
 if not game:IsLoaded() then
@@ -17,13 +17,13 @@ local TweenService = game:GetService("TweenService")
 local TeleportService = game:GetService("TeleportService")
 local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
-local ProximityPromptService = game:GetService("ProximityPromptService")
 local SoundService = game:GetService("SoundService")
 local CoreGui = game:GetService("CoreGui")
 
 local LP = Players.LocalPlayer
 local PlayerGui = LP:WaitForChild("PlayerGui")
 
+local RNG = Random.new()
 local JOIN_TIME = os.clock()
 
 --========================================================
@@ -51,6 +51,11 @@ local GOOD_SOUND_ID =
 	"rbxassetid://103185549195508"
 
 local MOBILE_MENU_SCALE = 0.5
+
+-- Random hopper
+local SERVER_LIMIT = 100
+local HOP_RETRY_DELAY = 0.05
+local HTTP_WAIT_LIMIT = 1.5
 
 --========================================================
 -- SAVE DATA
@@ -1091,6 +1096,8 @@ local radarCircleEnabled =
 local playerHighlightEnabled =
 	Saved.PlayerHighlight ~= false
 
+local refreshButtons
+
 local function updateToggle(
 	button,
 	outline,
@@ -1216,9 +1223,11 @@ local function parseMoney(text)
 
 	elseif suffix == "Q" then
 		multiplier = 1e15
+
 	end
 
-	return number * multiplier
+	return
+		number * multiplier
 
 end
 
@@ -1392,8 +1401,6 @@ local WatchedMoney = {}
 local BrainrotESP = {}
 local announced = {}
 
-local refreshButtons
-
 local function hasGoodBrainrot()
 
 	for label, data in pairs(
@@ -1501,7 +1508,6 @@ local function createESP(label, data)
 			90
 		)
 
-	-- 65% transparent
 	text.TextTransparency = 0.65
 	text.TextStrokeTransparency = 0.65
 
@@ -1555,12 +1561,10 @@ local function createESP(label, data)
 		WorldFolder
 
 	BrainrotESP[label] = {
-
 		Gui = billboard,
 		Label = text,
 		Attachment = attachment,
 		Beam = beam
-
 	}
 
 end
@@ -1588,9 +1592,7 @@ local function checkMoney(obj)
 		not obj
 		or not obj.Parent
 	then
-
 		return
-
 	end
 
 	local value =
@@ -1658,13 +1660,11 @@ local function checkMoney(obj)
 
 		end
 
-		-- STOP AUTO HOP AS SOON AS $20M+ APPEARS
 		stopAutoHop()
 
 	else
 
 		announced[obj] = nil
-
 		removeESP(obj)
 
 	end
@@ -1681,9 +1681,7 @@ local function watchMoney(obj)
 		not obj:IsA("TextLabel")
 		and not obj:IsA("TextButton")
 	then
-
 		return
-
 	end
 
 	WatchedMoney[obj] = true
@@ -1930,9 +1928,7 @@ BrainrotList.CanvasSize =
 	UDim2.new()
 
 BrainrotList.ScrollBarThickness = 3
-
-BrainrotList.Parent =
-	BrainrotPanel
+BrainrotList.Parent = BrainrotPanel
 
 local BrainrotLayout =
 	Instance.new(
@@ -2103,8 +2099,7 @@ local function refreshBrainrotList()
 				"TextButton"
 			)
 
-		row.LayoutOrder =
-			index
+		row.LayoutOrder = index
 
 		row.Size =
 			UDim2.new(
@@ -2122,7 +2117,6 @@ local function refreshBrainrotList()
 			)
 
 		row.BorderSizePixel = 0
-		row.AutoButtonColor = false
 
 		row.Text =
 			"#"
@@ -2148,9 +2142,7 @@ local function refreshBrainrotList()
 			Enum.Font.GothamBold
 
 		row.TextSize = 12
-
-		row.Parent =
-			BrainrotList
+		row.Parent = BrainrotList
 
 		corner(
 			row,
@@ -2321,23 +2313,16 @@ RadarClose.BackgroundColor3 =
 	)
 
 RadarClose.BorderSizePixel = 0
-
 RadarClose.Text = "×"
 
 RadarClose.TextColor3 =
-	Color3.new(
-		1,
-		1,
-		1
-	)
+	Color3.new(1, 1, 1)
 
 RadarClose.Font =
 	Enum.Font.GothamBlack
 
 RadarClose.TextSize = 20
-
-RadarClose.Parent =
-	RadarPanel
+RadarClose.Parent = RadarPanel
 
 corner(
 	RadarClose,
@@ -2402,9 +2387,11 @@ makeDraggable(
 RadarClose.MouseButton1Click:
 	Connect(function()
 
-		RadarPanel.Visible = false
+		RadarPanel.Visible =
+			false
 
-		Saved.RadarMenuOpen = false
+		Saved.RadarMenuOpen =
+			false
 
 		Saved.RadarMenuPosition =
 			savePos(
@@ -2507,9 +2494,7 @@ local function setupPlayer(player)
 				"BillboardGui"
 			)
 
-		billboard.Adornee =
-			head
-
+		billboard.Adornee = head
 		billboard.AlwaysOnTop = true
 		billboard.MaxDistance = 100000
 
@@ -2528,8 +2513,7 @@ local function setupPlayer(player)
 				0
 			)
 
-		billboard.Parent =
-			Gui
+		billboard.Parent = Gui
 
 		local name =
 			Instance.new(
@@ -2554,12 +2538,8 @@ local function setupPlayer(player)
 				1
 			)
 
-		name.TextStrokeTransparency =
-			0.1
-
-		name.Font =
-			Enum.Font.GothamBlack
-
+		name.TextStrokeTransparency = 0.1
+		name.Font = Enum.Font.GothamBlack
 		name.TextScaled = true
 
 		name.Parent =
@@ -2576,17 +2556,11 @@ local function setupPlayer(player)
 		highlight.DepthMode =
 			Enum.HighlightDepthMode.AlwaysOnTop
 
-		highlight.FillTransparency =
-			0.2
+		highlight.FillTransparency = 0.2
+		highlight.OutlineTransparency = 0
 
-		highlight.OutlineTransparency =
-			0
-
-		highlight.Enabled =
-			false
-
-		highlight.Parent =
-			character
+		highlight.Enabled = false
+		highlight.Parent = character
 
 		data.Billboard =
 			billboard
@@ -3357,7 +3331,8 @@ local function getNearestPrompt()
 				or 10
 
 			if
-				distance <= activation + 0.75
+				distance
+				<= activation + 0.75
 				and distance < bestDistance
 			then
 
@@ -3742,20 +3717,6 @@ PlayerHighlightButton.MouseButton1Click:
 		Saved.PlayerHighlight =
 			playerHighlightEnabled
 
-		if not playerHighlightEnabled then
-
-			for _, data in pairs(
-				PlayerESP
-			) do
-
-				if data.Highlight then
-					data.Highlight.Enabled = false
-				end
-
-			end
-
-		end
-
 		refreshButtons()
 		saveSettings()
 
@@ -3808,15 +3769,16 @@ BrainrotClose.MouseButton1Click:
 	end)
 
 --========================================================
--- NORMAL ROBLOX SERVER HOP
+-- RANDOM JOBID SERVER HOP
 --
--- NO HTTP SEARCH
--- NO PUBLIC SERVER API
--- NO SERVER-LIST PAGINATION
--- NO RECENT-SERVER SCAN
+-- This avoids normal Roblox friend matchmaking.
 --========================================================
 
 local hopping = false
+
+local failedServers = {}
+
+local cachedServers = {}
 
 local function resetHopButton()
 
@@ -3828,13 +3790,294 @@ local function resetHopButton()
 
 end
 
+--========================================================
+-- FAST HTTP
+--========================================================
+
+local function fastHttpGet(url)
+
+	local finished =
+		false
+
+	local result =
+		nil
+
+	-- Try executor request first.
+	local requestFunction =
+		request
+		or http_request
+		or (
+			syn
+			and syn.request
+		)
+
+	if type(requestFunction) == "function" then
+
+		task.spawn(function()
+
+			local ok,
+				response =
+				pcall(function()
+
+					return requestFunction({
+
+						Url =
+							url,
+
+						Method =
+							"GET",
+
+						Timeout =
+							HTTP_WAIT_LIMIT
+
+					})
+
+				end)
+
+			if
+				ok
+				and response
+				and response.Body
+			then
+
+				result =
+					response.Body
+
+			end
+
+			finished =
+				true
+
+		end)
+
+	else
+
+		task.spawn(function()
+
+			local ok,
+				body =
+				pcall(function()
+
+					return game:HttpGet(
+						url
+					)
+
+				end)
+
+			if ok then
+
+				result =
+					body
+
+			end
+
+			finished =
+				true
+
+		end)
+
+	end
+
+	local started =
+		os.clock()
+
+	while
+		not finished
+		and os.clock() - started
+			< HTTP_WAIT_LIMIT
+	do
+
+		task.wait(
+			0.01
+		)
+
+	end
+
+	return result
+
+end
+
+--========================================================
+-- DOWNLOAD ONE SERVER PAGE
+--========================================================
+
+local function fetchRandomServerPage()
+
+	local order =
+		RNG:NextInteger(
+			1,
+			2
+		) == 1
+		and "Asc"
+		or "Desc"
+
+	local url =
+		"https://games.roblox.com/v1/games/"
+		.. tostring(
+			TARGET_PLACE_ID
+		)
+		.. "/servers/Public?sortOrder="
+		.. order
+		.. "&limit="
+		.. tostring(
+			SERVER_LIMIT
+		)
+
+	local body =
+		fastHttpGet(
+			url
+		)
+
+	if not body then
+		return {}
+	end
+
+	local ok,
+		data =
+		pcall(function()
+
+			return
+				HttpService:
+					JSONDecode(
+						body
+					)
+
+		end)
+
+	if
+		not ok
+		or not data
+		or type(data.data) ~= "table"
+	then
+
+		return {}
+
+	end
+
+	local result = {}
+
+	for _, server in ipairs(
+		data.data
+	) do
+
+		local id =
+			server.id
+
+		local playing =
+			tonumber(
+				server.playing
+			)
+
+		local maxPlayers =
+			tonumber(
+				server.maxPlayers
+			)
+
+		if
+			id
+			and id ~= ""
+			and id ~= game.JobId
+			and not failedServers[id]
+			and playing
+			and maxPlayers
+			and playing < maxPlayers
+		then
+
+			table.insert(
+				result,
+				id
+			)
+
+		end
+
+	end
+
+	-- Shuffle the page so selection isn't biased.
+	for i = #result, 2, -1 do
+
+		local j =
+			RNG:NextInteger(
+				1,
+				i
+			)
+
+		result[i],
+			result[j] =
+			result[j],
+			result[i]
+
+	end
+
+	return result
+
+end
+
+--========================================================
+-- GET RANDOM SERVER
+--========================================================
+
+local function getRandomServer()
+
+	-- Use cached JobIds first.
+	while #cachedServers > 0 do
+
+		local index =
+			RNG:NextInteger(
+				1,
+				#cachedServers
+			)
+
+		local id =
+			table.remove(
+				cachedServers,
+				index
+			)
+
+		if
+			id
+			and id ~= game.JobId
+			and not failedServers[id]
+		then
+
+			return id
+
+		end
+
+	end
+
+	-- Only fetch one page when cache runs out.
+	cachedServers =
+		fetchRandomServerPage()
+
+	if #cachedServers == 0 then
+		return nil
+	end
+
+	local index =
+		RNG:NextInteger(
+			1,
+			#cachedServers
+		)
+
+	return table.remove(
+		cachedServers,
+		index
+	)
+
+end
+
+--========================================================
+-- HOP
+--========================================================
+
 local function serverHop()
 
 	if hopping then
 		return
 	end
 
-	hopping = true
+	hopping =
+		true
 
 	HopButton.Text =
 		"HOPPING..."
@@ -3844,38 +4087,132 @@ local function serverHop()
 
 	task.spawn(function()
 
-		local success =
-			pcall(function()
+		while
+			Gui.Parent
+			and hopping
+		do
 
-				TeleportService:Teleport(
-					TARGET_PLACE_ID,
-					LP
+			local serverId =
+				getRandomServer()
+
+			if not serverId then
+
+				HopButton.Text =
+					"RETRYING..."
+
+				task.wait(
+					HOP_RETRY_DELAY
 				)
 
-			end)
+				continue
 
-		if not success then
+			end
 
-			hopping = false
+			-- Never deliberately join current JobId.
+			if serverId == game.JobId then
 
-			resetHopButton()
+				failedServers[
+					serverId
+				] =
+					true
 
-			task.delay(
-				0.05,
-				function()
+				continue
 
-					if autoHopEnabled then
-						serverHop()
-					end
+			end
 
-				end
+			HopButton.Text =
+				"HOPPING..."
+
+			local success =
+				pcall(function()
+
+					TeleportService:
+						TeleportToPlaceInstance(
+
+							TARGET_PLACE_ID,
+
+							serverId,
+
+							LP
+
+						)
+
+				end)
+
+			if success then
+
+				return
+
+			end
+
+			failedServers[
+				serverId
+			] =
+				true
+
+			HopButton.Text =
+				"RETRYING..."
+
+			task.wait(
+				HOP_RETRY_DELAY
 			)
 
 		end
 
+		hopping =
+			false
+
+		resetHopButton()
+
 	end)
 
 end
+
+--========================================================
+-- TELEPORT FAILURE
+--========================================================
+
+pcall(function()
+
+	TeleportService.TeleportInitFailed:
+		Connect(function(player)
+
+			if player ~= LP then
+				return
+			end
+
+			hopping =
+				false
+
+			resetHopButton()
+
+			if autoHopEnabled then
+
+				task.delay(
+					HOP_RETRY_DELAY,
+					function()
+
+						if
+							autoHopEnabled
+							and Gui.Parent
+						then
+
+							serverHop()
+
+						end
+
+					end
+				)
+
+			end
+
+		end)
+
+end)
+
+--========================================================
+-- MANUAL HOP
+--========================================================
 
 HopButton.MouseButton1Click:
 	Connect(function()
@@ -3904,33 +4241,6 @@ UserInputService.InputBegan:
 		end
 
 	end)
-
-pcall(function()
-
-	TeleportService.TeleportInitFailed:
-		Connect(function(player)
-
-			if player ~= LP then
-				return
-			end
-
-			hopping =
-				false
-
-			resetHopButton()
-
-			if autoHopEnabled then
-
-				task.delay(
-					0.05,
-					serverHop
-				)
-
-			end
-
-		end)
-
-end)
 
 --========================================================
 -- AUTO HOP

@@ -4247,13 +4247,3 @@ end)
 --========================================================
 
 refreshButtons()
-
-print("[FTX] LOADED")
-print("[FTX] AUTO HOP WAIT = 1 SECOND")
-print("[FTX] ULTRA FAST SERVER LOOKUP = ON")
-print("[FTX] MULTI-PAGE PRE-SCAN = OFF")
-print("[FTX] LONG TELEPORT WATCHDOG = OFF")
-print("[FTX] CURRENT SERVER =", game.JobId)
-print("[FTX] CURRENT SERVER REJOIN PROTECTION = ON")
-print("[FTX] $20M SOUND =", GOOD_SOUND_ID)
-print("[FTX] SETTINGS SAVE =", canSave)

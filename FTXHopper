@@ -3760,129 +3760,158 @@ MiaButton.MouseButton1Click:
 
 --========================================================
 -- SERVER HOPPER
+-- NO JOBID SAME-SERVER CHECK
 --========================================================
 
 local hopping = false
 
-local failedServers = {}
+local SERVER_FINGERPRINT_FILE =
+	"FTX_LastPlayers.json"
 
-local function getHTTP(url)
+local SAME_SERVER_OVERLAP =
+	0.70
 
-	local req =
-		getRequestFunction()
+local SAME_SERVER_RETRY =
+	0.15
 
-	if type(req) == "function" then
 
-		local success,
-			response =
-			pcall(function()
+local function getCurrentServerPlayers()
 
-				return req({
-					Url = url,
-					Method = "GET"
-				})
-			end)
+	local result = {}
 
-		if
-			success
-			and response
-			and response.Body
-		then
-
-			return response.Body
-		end
-	end
-
-	local success,
-		body =
-		pcall(function()
-
-			return game:HttpGet(url)
-		end)
-
-	if success then
-		return body
-	end
-end
-
-local function getServerCandidates()
-
-	local url =
-		"https://games.roblox.com/v1/games/"
-		.. tostring(
-			TARGET_PLACE_ID
-		)
-		.. "/servers/Public?sortOrder=Asc&limit=100"
-
-	local body =
-		getHTTP(url)
-
-	if not body then
-		return {}
-	end
-
-	local success,
-		data =
-		pcall(function()
-
-			return
-				HttpService:
-					JSONDecode(
-						body
-					)
-		end)
-
-	if
-		not success
-		or not data
-		or type(data.data) ~= "table"
-	then
-		return {}
-	end
-
-	local servers = {}
-
-	for _, server in ipairs(
-		data.data
+	for _, player in ipairs(
+		Players:GetPlayers()
 	) do
 
-		local id =
-			server.id
+		if player ~= LP then
 
-		local playing =
-			tonumber(
-				server.playing
-			)
+			result[
+				tostring(
+					player.UserId
+				)
+			] = true
 
-		local maximum =
-			tonumber(
-				server.maxPlayers
-			)
-
-		if
-			id
-			and id ~= game.JobId
-			and not failedServers[id]
-			and playing
-			and maximum
-			and playing < maximum
-		then
-
-			table.insert(
-				servers,
-				server
-			)
 		end
+
 	end
 
-	return servers
+	return result
+
 end
+
+
+local function saveServerPlayers()
+
+	if
+		typeof(writefile) ~= "function"
+	then
+		return
+	end
+
+	local playersNow =
+		getCurrentServerPlayers()
+
+	pcall(function()
+
+		writefile(
+			SERVER_FINGERPRINT_FILE,
+
+			HttpService:JSONEncode(
+				playersNow
+			)
+		)
+
+	end)
+
+end
+
+
+local function loadPreviousPlayers()
+
+	if
+		typeof(readfile) ~= "function"
+		or
+		typeof(isfile) ~= "function"
+	then
+		return nil
+	end
+
+	if not isfile(
+		SERVER_FINGERPRINT_FILE
+	) then
+		return nil
+	end
+
+	local result = nil
+
+	pcall(function()
+
+		result =
+			HttpService:JSONDecode(
+				readfile(
+					SERVER_FINGERPRINT_FILE
+				)
+			)
+
+	end)
+
+	return result
+
+end
+
+
+local function sameServerByPlayers()
+
+	local previous =
+		loadPreviousPlayers()
+
+	if type(previous) ~= "table" then
+		return false
+	end
+
+	local current =
+		getCurrentServerPlayers()
+
+	local previousCount = 0
+	local matches = 0
+
+	for userId in pairs(
+		previous
+	) do
+
+		previousCount += 1
+
+		if current[userId] then
+			matches += 1
+		end
+
+	end
+
+	if previousCount == 0 then
+		return false
+	end
+
+	local overlap =
+		matches
+		/ previousCount
+
+	return
+		overlap
+		>= SAME_SERVER_OVERLAP
+
+end
+
 
 local function resetHopButton()
 
-	HopButton.Text = "HOP"
-	HopButton.TextSize = 24
+	HopButton.Text =
+		"HOP"
+
+	HopButton.TextSize =
+		24
+
 end
+
 
 local function serverHop()
 
@@ -3890,90 +3919,60 @@ local function serverHop()
 		return
 	end
 
-	hopping = true
+	hopping =
+		true
 
 	HopButton.Text =
-		"FINDING..."
+		"HOPPING..."
 
-	HopButton.TextSize = 14
+	HopButton.TextSize =
+		14
+
+	saveServerPlayers()
 
 	task.spawn(function()
 
-		for _ = 1, 6 do
+		local success =
+			pcall(function()
 
-			if not hopping then
-				return
-			end
+				TeleportService:
+					Teleport(
+						TARGET_PLACE_ID,
+						LP
+					)
 
-			local servers =
-				getServerCandidates()
+			end)
 
-			if #servers > 0 then
+		if not success then
 
-				local server =
-					servers[
-						RNG:
-							NextInteger(
-								1,
-								#servers
-							)
-					]
+			hopping =
+				false
 
-				if
-					server
-					and server.id
-					and server.id ~= game.JobId
-				then
+			resetHopButton()
 
-					HopButton.Text =
-						"HOPPING..."
+			task.delay(
+				SAME_SERVER_RETRY,
+				function()
 
-					local success =
-						pcall(function()
+					if
+						autoHopEnabled
+						and
+						Gui.Parent
+					then
 
-							TeleportService:
-								TeleportToPlaceInstance(
-									TARGET_PLACE_ID,
-									server.id,
-									LP
-								)
-						end)
+						serverHop()
 
-					if success then
-						return
 					end
 
-					failedServers[
-						server.id
-					] = true
 				end
+			)
 
-			else
-
-				-- Old fallback behavior
-
-				HopButton.Text =
-					"RANDOM..."
-
-				pcall(function()
-
-					TeleportService:
-						Teleport(
-							TARGET_PLACE_ID,
-							LP
-						)
-				end)
-			end
-
-			task.wait(0.15)
 		end
 
-		hopping = false
-
-		resetHopButton()
-
 	end)
+
 end
+
 
 pcall(function()
 
@@ -3984,17 +3983,44 @@ pcall(function()
 				return
 			end
 
-			hopping = false
+			hopping =
+				false
 
 			resetHopButton()
+
+			if autoHopEnabled then
+
+				task.delay(
+					SAME_SERVER_RETRY,
+					function()
+
+						if
+							autoHopEnabled
+							and
+							Gui.Parent
+						then
+
+							serverHop()
+
+						end
+
+					end
+				)
+
+			end
+
 		end)
+
 end)
+
 
 HopButton.MouseButton1Click:
 	Connect(function()
 
 		serverHop()
+
 	end)
+
 
 UserInputService.InputBegan:
 	Connect(function(
@@ -4012,10 +4038,35 @@ UserInputService.InputBegan:
 		then
 
 			serverHop()
+
 		end
+
 	end)
 
+
 --========================================================
+-- CHECK IF MATCHMAKING SENT US BACK
+--========================================================
+
+task.spawn(function()
+
+	task.wait(1.5)
+
+	if sameServerByPlayers() then
+
+		hopping =
+			false
+
+		HopButton.Text =
+			"RE-HOPPING..."
+
+		task.wait(0.05)
+
+		serverHop()
+
+	end
+
+end)--========================================================
 -- AUTO HOP
 --
 -- BEHAVIOR:
